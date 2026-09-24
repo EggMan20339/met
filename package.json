@@ -1,0 +1,13 @@
+{
+  "name": "glimmerdeep",
+  "version": "1.0.0",
+  "description": "A Hollow Knight x Ori inspired metroidvania in vanilla HTML5 canvas — no build step, no dependencies.",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes serve -l 8080 .",
+    "check": "node tools/checkmap.js",
+    "solve": "node tools/solver.js --abilities dash,walljump,doublejump",
+    "test": "node tools/checkmap.js && node test/smoke.js && node test/boss.js"
+  },
+  "license": "MIT"
+}
