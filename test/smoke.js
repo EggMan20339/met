@@ -27,22 +27,32 @@ const server = http.createServer((req, res) => {
   await hold('ArrowLeft', 1500); await page.keyboard.press('ArrowUp'); await page.waitForTimeout(500); await page.screenshot({ path: path.join(outDir, '04-interact.png') });
   const sDlg = await state();
   for (let i = 0; i < 5; i++) { await page.keyboard.press('Enter'); await page.waitForTimeout(150); }
-  await page.keyboard.press('KeyM'); await page.waitForTimeout(300); await page.screenshot({ path: path.join(outDir, '05-map.png') }); await page.keyboard.press('KeyM');
-  await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.screenshot({ path: path.join(outDir, '06-pause.png') }); await page.keyboard.press('Escape');
+  await page.keyboard.press('KeyM'); await page.waitForTimeout(300); await page.screenshot({ path: path.join(outDir, '05-map.png') }); await page.keyboard.press('KeyM'); await page.waitForTimeout(150);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.screenshot({ path: path.join(outDir, '06-pause.png') }); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  const sResumed = await state();
   // area tour: teleport around the world for visual checks of every palette
   const tour = [['10-mossgrove', 200, 91], ['11-depths', 45, 110], ['12-heights', 52, 34], ['13-spire', 190, 27], ['14-westcaves', 60, 78]];
   for (const [name, tx, ty] of tour) {
     await page.evaluate(([tx, ty]) => { const g = window.game, p = g.player; p.x = tx * 16 + 3; p.y = ty * 16 + 16 - p.h; p.vx = 0; p.vy = 0; p.invuln = 1e9; g.cam.x = p.x - 240; g.cam.y = p.y - 135; g.ui.areaTitle = null; }, [tx, ty]);
     await page.waitForTimeout(700); await page.screenshot({ path: path.join(outDir, name + '.png') });
   }
+  // save / continue round-trip: grant dash, rest at the start bench, reload, continue
+  await page.evaluate(() => { const g = window.game, p = g.player; p.abilities.dash = true; p.x = 87 * 16 + 3; p.y = 79 * 16 - p.h; p.vx = 0; p.vy = 0; p.onGround = true; });
+  await page.waitForTimeout(200); await page.keyboard.press('ArrowUp'); await page.waitForTimeout(600);
+  const sBench = await page.evaluate(() => ({ sitting: window.game.player.sitting, saved: !!localStorage.getItem('glimmerdeep_save_v1') }));
+  await page.reload(); await page.waitForTimeout(600);
+  const sTitle = await page.evaluate(() => ({ state: window.game.state, hasSave: window.game.hasSave }));
+  await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+  const sLoaded = await page.evaluate(() => { const g = window.game, p = g.player; return { state: g.state, dash: p.abilities.dash, x: Math.round(p.x), benchX: Math.round(g.benchPos.x) }; });
   // measure frame time
   const perf = await page.evaluate(() => new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (n < 120) requestAnimationFrame(f); else res((performance.now() - t0) / n); }; requestAnimationFrame(f); }));
   // world overview render (debug)
   const overview = await page.evaluate(() => window.game.renderOverview ? window.game.renderOverview() : null);
   if (overview) fs.writeFileSync(path.join(outDir, '00-world.png'), Buffer.from(overview.split(',')[1], 'base64'));
-  console.log(JSON.stringify({ s0, s1, sJump, sDlg, msPerFrame: +perf.toFixed(2), errors }, null, 1));
+  console.log(JSON.stringify({ s0, s1, sJump, sDlg, sResumed: sResumed.state, sBench, sTitle, sLoaded, msPerFrame: +perf.toFixed(2), errors }, null, 1));
   await browser.close(); server.close();
-  const moved = s1.x > s0.x + 40; const jumped = !sJump.onGround;
-  if (errors.length || !moved || !jumped) { console.error('SMOKE FAILED', { moved, jumped, errors }); process.exit(1); }
+  const moved = s1.x > s0.x + 40; const jumped = !sJump.onGround; const resumed = sResumed.state === 'play';
+  const saved = sBench.sitting && sBench.saved && sTitle.hasSave && sLoaded.state === 'play' && sLoaded.dash && Math.abs(sLoaded.x - sLoaded.benchX) < 2;
+  if (errors.length || !moved || !jumped || !resumed || !saved) { console.error('SMOKE FAILED', { moved, jumped, resumed, saved, errors }); process.exit(1); }
   console.log('SMOKE OK');
 })().catch((e) => { console.error(e); process.exit(1); });

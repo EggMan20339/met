@@ -63,7 +63,7 @@ Everything lives in `src/`:
 | `ui.js` | HUD, dialogue, map, menus, title and ending. |
 | `game.js` | State machine, fixed-step loop, camera, orchestration. |
 
-Tools and tests (Node 18+, Playwright with Chromium for the browser tests):
+Tools and tests (Node 18+; the browser tests need `npm install` and `npx playwright install chromium` once):
 
 ```
 npm run check    # stitches the map, verifies required entities and connectivity

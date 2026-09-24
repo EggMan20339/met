@@ -1,10 +1,10 @@
 // ---- Rendering: tile atlas chunks, parallax backgrounds, lighting -------------
 const PALETTES = {
-  hollow:    { rock: '#34324a', rockDark: '#222036', edge: '#55527a', top: '#625f84', topHi: '#9995bc', bg0: '#0d0c1a', bg1: '#242044', fog: '#2f2c50', dark: 0.36, light: '#c0b8ff', ambient: 'dust', decor: '#6c6890' },
-  mossgrove: { rock: '#2e422e', rockDark: '#1c2c1c', edge: '#476644', top: '#57944a', topHi: '#a6ea68', bg0: '#0a1610', bg1: '#1b3c2a', fog: '#24482f', dark: 0.28, light: '#c8ffa0', ambient: 'spore', decor: '#7ccf5a' },
-  depths:    { rock: '#223244', rockDark: '#141e2e', edge: '#375272', top: '#42688e', topHi: '#80b8e4', bg0: '#060b14', bg1: '#10243a', fog: '#132a40', dark: 0.5, light: '#8ce0ff', ambient: 'bubble', decor: '#4fc3f7' },
-  heights:   { rock: '#3f3355', rockDark: '#28203a', edge: '#6a5288', top: '#8662ac', topHi: '#dcb2ff', bg0: '#140c22', bg1: '#33245a', fog: '#3c2a66', dark: 0.3, light: '#ecc0ff', ambient: 'sparkle', decor: '#e6b3ff' },
-  spire:     { rock: '#442a26', rockDark: '#281816', edge: '#6e4436', top: '#885240', topHi: '#f49656', bg0: '#180a08', bg1: '#3a1a14', fog: '#4a261e', dark: 0.38, light: '#ffb878', ambient: 'ember', decor: '#ff8a3c' },
+  hollow:    { rock: '#34324a', rockDark: '#222036', edge: '#55527a', top: '#625f84', topHi: '#9995bc', bg0: '#0d0c1a', bg1: '#242044', fog: '#2f2c50', dark: 0.3, light: '#c0b8ff', ambient: 'dust', decor: '#6c6890' },
+  mossgrove: { rock: '#2e422e', rockDark: '#1c2c1c', edge: '#476644', top: '#57944a', topHi: '#a6ea68', bg0: '#0a1610', bg1: '#1b3c2a', fog: '#24482f', dark: 0.22, light: '#c8ffa0', ambient: 'spore', decor: '#7ccf5a' },
+  depths:    { rock: '#223244', rockDark: '#141e2e', edge: '#375272', top: '#42688e', topHi: '#80b8e4', bg0: '#060b14', bg1: '#10243a', fog: '#132a40', dark: 0.42, light: '#8ce0ff', ambient: 'bubble', decor: '#4fc3f7' },
+  heights:   { rock: '#3f3355', rockDark: '#28203a', edge: '#6a5288', top: '#8662ac', topHi: '#dcb2ff', bg0: '#140c22', bg1: '#33245a', fog: '#3c2a66', dark: 0.24, light: '#ecc0ff', ambient: 'sparkle', decor: '#e6b3ff' },
+  spire:     { rock: '#442a26', rockDark: '#281816', edge: '#6e4436', top: '#885240', topHi: '#f49656', bg0: '#180a08', bg1: '#3a1a14', fog: '#4a261e', dark: 0.32, light: '#ffb878', ambient: 'ember', decor: '#ff8a3c' },
 };
 const CHUNK = 32; // tiles per chunk edge
 

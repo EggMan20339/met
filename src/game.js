@@ -363,7 +363,7 @@ class Game {
     for (const pr of this.projectiles) { drawProjectile(ctx, pr, t); lights.push({ x: pr.x, y: pr.y, r: 22, a: 0.6, color: pr.kind === 'shock' ? '#ff9a4a' : '#c8ff5a', glow: 0.15 }); }
     R.drawParticles(ctx, { x: 0, y: 0 }, fx);
     ctx.restore();
-    if (!p.dead) lights.unshift({ x: pc.x, y: pc.y, r: p.focusing ? 150 : 128, a: 0.95, color: p.focusing ? '#ffd080' : '#b8c4ff', glow: p.focusing ? 0.3 : 0.14 });
+    if (!p.dead) lights.unshift({ x: pc.x, y: pc.y, r: p.focusing ? 170 : 150, a: 0.95, color: p.focusing ? '#ffd080' : '#b8c4ff', glow: p.focusing ? 0.3 : 0.14 });
     R.drawLighting(ctx, c, lights, PALETTES[this.area]);
     if (fx.flash > 0) { ctx.globalAlpha = fx.flash; ctx.fillStyle = fx.flashColor; ctx.fillRect(0, 0, VIEW_W, VIEW_H); ctx.globalAlpha = 1; }
     if (this.fadeAlpha > 0) this.fadeAlpha = Math.max(0, this.fadeAlpha - 0.02);
