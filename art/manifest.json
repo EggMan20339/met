@@ -1,0 +1,462 @@
+{
+ "mote_idle": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_run1": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_run2": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_run3": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_run4": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_jump": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_fall": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_cling": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_dash": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_hurt": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_sit": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_cast": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_strike": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "mote_focus": {
+  "w": 36,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "dimling_a": {
+  "w": 26,
+  "h": 20,
+  "anchor": "bottom"
+ },
+ "dimling_b": {
+  "w": 26,
+  "h": 20,
+  "anchor": "bottom"
+ },
+ "hushmoth_up": {
+  "w": 26,
+  "h": 20,
+  "anchor": "center"
+ },
+ "hushmoth_down": {
+  "w": 26,
+  "h": 20,
+  "anchor": "center"
+ },
+ "sporeling_idle": {
+  "w": 24,
+  "h": 28,
+  "anchor": "bottom"
+ },
+ "sporeling_charge": {
+  "w": 24,
+  "h": 28,
+  "anchor": "bottom"
+ },
+ "rootram_a": {
+  "w": 34,
+  "h": 24,
+  "anchor": "bottom"
+ },
+ "rootram_b": {
+  "w": 34,
+  "h": 24,
+  "anchor": "bottom"
+ },
+ "rootram_charge": {
+  "w": 34,
+  "h": 24,
+  "anchor": "bottom"
+ },
+ "snuffer_idle": {
+  "w": 22,
+  "h": 22,
+  "anchor": "center"
+ },
+ "snuffer_tele": {
+  "w": 22,
+  "h": 22,
+  "anchor": "center"
+ },
+ "emberback_a": {
+  "w": 28,
+  "h": 20,
+  "anchor": "bottom"
+ },
+ "emberback_b": {
+  "w": 28,
+  "h": 20,
+  "anchor": "bottom"
+ },
+ "emberback_shell": {
+  "w": 28,
+  "h": 20,
+  "anchor": "bottom"
+ },
+ "gloamwing_up": {
+  "w": 32,
+  "h": 20,
+  "anchor": "center"
+ },
+ "gloamwing_down": {
+  "w": 32,
+  "h": 20,
+  "anchor": "center"
+ },
+ "gloamwing_fire": {
+  "w": 32,
+  "h": 20,
+  "anchor": "center"
+ },
+ "springfoot_idle": {
+  "w": 26,
+  "h": 22,
+  "anchor": "bottom"
+ },
+ "springfoot_crouch": {
+  "w": 26,
+  "h": 22,
+  "anchor": "bottom"
+ },
+ "springfoot_air": {
+  "w": 26,
+  "h": 22,
+  "anchor": "bottom"
+ },
+ "husk_walk_a": {
+  "w": 34,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "husk_walk_b": {
+  "w": 34,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "husk_idle": {
+  "w": 34,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "husk_swing_tele": {
+  "w": 34,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "husk_swing": {
+  "w": 34,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "husk_lunge": {
+  "w": 34,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "husk_stagger": {
+  "w": 34,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "wick_a": {
+  "w": 36,
+  "h": 38,
+  "anchor": "bottom"
+ },
+ "wick_b": {
+  "w": 36,
+  "h": 38,
+  "anchor": "bottom"
+ },
+ "bramble": {
+  "w": 34,
+  "h": 34,
+  "anchor": "bottom"
+ },
+ "tallow": {
+  "w": 34,
+  "h": 30,
+  "anchor": "bottom"
+ },
+ "ringer": {
+  "w": 30,
+  "h": 36,
+  "anchor": "bottom"
+ },
+ "gulletroot_closed": {
+  "w": 84,
+  "h": 64,
+  "anchor": "bottom"
+ },
+ "gulletroot_open": {
+  "w": 84,
+  "h": 64,
+  "anchor": "bottom"
+ },
+ "gulletroot_tele": {
+  "w": 84,
+  "h": 64,
+  "anchor": "bottom"
+ },
+ "bell_hover": {
+  "w": 56,
+  "h": 64,
+  "anchor": "center"
+ },
+ "bell_toll": {
+  "w": 56,
+  "h": 64,
+  "anchor": "center"
+ },
+ "bell_stunned": {
+  "w": 56,
+  "h": 64,
+  "anchor": "center"
+ },
+ "lightless_idle": {
+  "w": 72,
+  "h": 52,
+  "anchor": "bottom"
+ },
+ "lightless_charge": {
+  "w": 72,
+  "h": 52,
+  "anchor": "bottom"
+ },
+ "lightless_leap": {
+  "w": 72,
+  "h": 52,
+  "anchor": "bottom"
+ },
+ "lightless_stun": {
+  "w": 72,
+  "h": 52,
+  "anchor": "bottom"
+ },
+ "lightless_phase2": {
+  "w": 72,
+  "h": 52,
+  "anchor": "bottom"
+ },
+ "lightless_phase3": {
+  "w": 72,
+  "h": 52,
+  "anchor": "bottom"
+ },
+ "petal": {
+  "w": 18,
+  "h": 18,
+  "anchor": "center"
+ },
+ "heartwood": {
+  "w": 18,
+  "h": 18,
+  "anchor": "center"
+ },
+ "gift_windstep": {
+  "w": 24,
+  "h": 24,
+  "anchor": "center"
+ },
+ "gift_rootgrip": {
+  "w": 24,
+  "h": 24,
+  "anchor": "center"
+ },
+ "gift_skyleaf": {
+  "w": 24,
+  "h": 24,
+  "anchor": "center"
+ },
+ "gift_cinder": {
+  "w": 24,
+  "h": 24,
+  "anchor": "center"
+ },
+ "heart": {
+  "w": 28,
+  "h": 28,
+  "anchor": "center"
+ },
+ "hearth": {
+  "w": 40,
+  "h": 30,
+  "anchor": "bottom"
+ },
+ "hearth_cold": {
+  "w": 40,
+  "h": 30,
+  "anchor": "bottom"
+ },
+ "lamp": {
+  "w": 26,
+  "h": 40,
+  "anchor": "bottom"
+ },
+ "waystone": {
+  "w": 18,
+  "h": 22,
+  "anchor": "bottom"
+ },
+ "crystal": {
+  "w": 20,
+  "h": 22,
+  "anchor": "bottom"
+ },
+ "puffcap": {
+  "w": 18,
+  "h": 18,
+  "anchor": "bottom"
+ },
+ "gate": {
+  "w": 16,
+  "h": 16,
+  "anchor": "topleft"
+ },
+ "house": {
+  "w": 144,
+  "h": 100,
+  "anchor": "bottomleft"
+ },
+ "icon_petal": {
+  "w": 14,
+  "h": 16,
+  "anchor": "center"
+ },
+ "icon_lantern": {
+  "w": 18,
+  "h": 26,
+  "anchor": "center"
+ },
+ "logo": {
+  "w": 420,
+  "h": 90,
+  "anchor": "center"
+ },
+ "bg_rootshade_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_rootshade_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_fernwake_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_fernwake_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_drownwell_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_drownwell_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_chimeglass_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_chimeglass_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_bramblehush_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_bramblehush_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_puffcap_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_puffcap_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_lanternry_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_lanternry_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_cinderthroat_far": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ },
+ "bg_cinderthroat_near": {
+  "w": 1024,
+  "h": 640,
+  "anchor": "topleft"
+ }
+}

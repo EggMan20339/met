@@ -103,7 +103,9 @@ class Renderer {
     this.curArea = null; this.prevArea = null; this.areaFade = 1;
     this.textures = {}; this.rockGen = 0; this.rockKey = ''; this.rebuild();
   }
-  setSize(W, H, zoom) { this.W = W; this.H = H; this.zoom = zoom; this.LS = 0.5; this.dark.width = Math.ceil(W * this.LS); this.dark.height = Math.ceil(H * this.LS); this.glow.width = this.dark.width; this.glow.height = this.dark.height; this.bgc.width = this.dark.width; this.bgc.height = this.dark.height; this.rock.width = W; this.rock.height = H; }
+  setSize(W, H, zoom) { this.W = W; this.H = H; this.zoom = zoom; this.LS = 0.5; this.dark.width = Math.ceil(W * this.LS); this.dark.height = Math.ceil(H * this.LS); this.glow.width = this.dark.width; this.glow.height = this.dark.height; this.bgc.width = this.dark.width; this.bgc.height = this.dark.height; this.rock.width = W; this.rock.height = H; this.bgPx = Math.min(2, zoom * this.LS * this.bgFit(H / zoom)); }
+  // painted backgrounds are 1024x640; scale them up when the view is taller than that
+  bgFit(viewH) { return Math.max(1, (viewH * 1.06) / 640); }
   rebuild() {
     const w = this.world; this.chunks = new Map();
     this.crystalLoops = traceLoops(w, (x, y) => w.tile(x, y) === 'I', 3, 0.6, { x0: 0, y0: 0, x1: w.w - 1, y1: w.h - 1 });
@@ -211,7 +213,9 @@ class Renderer {
         const g = ctx.createLinearGradient(0, py, 0, py + 5); g.addColorStop(0, pal.top); g.addColorStop(1, pal.edgeGlow); ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(px - 1, py, TILE + 2, 4.5, 2); ctx.fill();
         ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(px, py + 4, TILE, 1.2); ctx.fillStyle = pal.edgeGlow; ctx.beginPath(); ctx.roundRect(px + 2, py + 4, 2, 4, 1); ctx.roundRect(px + 12, py + 4, 2, 4, 1); ctx.fill();
       } else if (ch === '%') { // bounce shroom cap
-        const sq = 1 + Math.sin(t * 5 + tx) * 0.04; ctx.save(); ctx.translate(px + 8, py + 16); ctx.scale(1 / sq, sq);
+        const sq = 1 + Math.sin(t * 5 + tx) * 0.04;
+        if (Art.ready && Art.draw(ctx, 'puffcap', px + 8, py + 16, { sx: 1 / sq, sy: sq })) continue;
+        ctx.save(); ctx.translate(px + 8, py + 16); ctx.scale(1 / sq, sq);
         ctx.fillStyle = '#d8d0e8'; ctx.fillRect(-2, -8, 4, 8); const g = ctx.createRadialGradient(-2, -12, 1, 0, -10, 10); g.addColorStop(0, '#ff9ad8'); g.addColorStop(1, '#a03a90'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, -10, 9, 5.5, 0, Math.PI, 0); ctx.quadraticCurveTo(0, -6, -9, -10); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.6)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(-5 + i * 4.5, -12 + (i % 2), 1.1, 0, TAU); ctx.fill(); } ctx.restore();
       } else if (ch === '.') this.drawDecor(ctx, tx, ty, px, py, area, pal, t);
@@ -265,9 +269,10 @@ class Renderer {
     this.areaFade = Math.min(1, this.areaFade + 0.016);
     const z = this.zoom * this.LS, b = this.bctx, BW = this.bgc.width, BH = this.bgc.height;
     const draw = (a, alpha) => {
-      const bg = this.getBg(a); const pal = bg.pal; b.setTransform(1, 0, 0, 1, 0, 0); b.globalAlpha = alpha;
+      const pal = PALETTES[a]; b.setTransform(1, 0, 0, 1, 0, 0); b.globalAlpha = alpha;
       const g = b.createLinearGradient(0, 0, 0, BH); g.addColorStop(0, pal.bg0); g.addColorStop(1, pal.bg1); b.fillStyle = g; b.fillRect(0, 0, BW, BH);
-      const lw = bg.W / bg.S, lh = bg.H / bg.S; // layer size in world units
+      if (this.drawPaintedBg(b, a, cam, viewW, viewH, z)) { b.globalAlpha = 1; return; }
+      const bg = this.getBg(a); const lw = bg.W / bg.S, lh = bg.H / bg.S; // layer size in world units
       for (const L of bg.layers) {
         const ox = ((cam.x * L.f) % lw + lw) % lw, oy = ((cam.y * L.f * 0.6) % lh + lh) % lh;
         for (let x = -ox; x < viewW; x += lw) for (let y = -oy; y < viewH; y += lh) b.drawImage(L.c, x * z, y * z, lw * z, lh * z);
@@ -276,6 +281,19 @@ class Renderer {
     };
     if (this.prevArea && this.areaFade < 1) { draw(this.prevArea, 1); draw(area, this.areaFade); } else draw(area, 1);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(this.bgc, 0, 0, BW, BH, 0, 0, this.W, this.H);
+  }
+  // The painted parallax layers (art/bg_<area>_far|near.svg). The far layer scrolls slowly, the near one faster;
+  // vertically they slide in proportion to how deep the camera is in the world, so they never need to tile.
+  drawPaintedBg(b, area, cam, viewW, viewH, z) {
+    const far = 'bg_' + area + '_far', near = 'bg_' + area + '_near';
+    if (!Art.ready || !Art.has(far) || !Art.has(near)) return false;
+    const m = ART_META[far]; const S = this.bgFit(viewH); const lw = m.w * S, lh = m.h * S; const px = this.bgPx || 1;
+    const depth = clamp(cam.y / Math.max(1, this.world.h * TILE - viewH), 0, 1);
+    for (const [name, f, vf] of [[far, 0.18, 0.55], [near, 0.42, 1]]) {
+      const c = Art.raster(name, px); const ox = ((cam.x * f) % lw + lw) % lw; const y = -depth * (lh - viewH) * vf;
+      for (let x = -ox; x < viewW; x += lw) b.drawImage(c, x * z, y * z, lw * z + 0.5, lh * z);
+    }
+    return true;
   }
   // ---------- lighting (half-resolution screen space, scaled up)
   drawLighting(ctx, cam, lights, pal, viewW, viewH) {

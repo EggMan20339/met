@@ -58,7 +58,7 @@ class Game {
     this.canvas.width = W; this.canvas.height = H; this.canvas.style.width = ww + 'px'; this.canvas.style.height = wh + 'px';
     const stage = document.getElementById('stage'); stage.style.width = ww + 'px'; stage.style.height = wh + 'px';
     this.uiCanvas.style.width = ww + 'px'; this.uiCanvas.style.height = wh + 'px';
-    this.zoom = Math.min(H / VIEW_H, W / 400); this.viewW = W / this.zoom; this.viewH = H / this.zoom;
+    this.zoom = Math.min(H / VIEW_H, W / 400); this.viewW = W / this.zoom; this.viewH = H / this.zoom; Art.setZoom(this.zoom);
     this.renderer.setSize(W, H, this.zoom); this.ui.resize(this.zoom, W, H, this.viewW, this.viewH);
   }
   // ---------- world setup / reset
@@ -104,7 +104,7 @@ class Game {
     if (!this.audioStarted && this.input.anyKeyPressed) { this.audio.init(); this.audioStarted = true; }
     this.audio.resume();
     this.time += dtReal;
-    this.adaptQuality(dtReal);
+    this.adaptQuality(dtReal); Art.prewarm(this.renderer.bgPx); // rasterise the artwork a piece per frame once it has decoded
     const STEP = 1 / 60; this.acc += dtReal * (this.state === 'play' ? this.fx.slowmo : 1); let steps = 0;
     while (this.acc >= STEP && steps < 5) { this.tick(STEP); this.acc -= STEP; steps++; }
     if (this.acc > STEP * 5) this.acc = STEP * 5;
@@ -464,8 +464,8 @@ class Game {
     for (const d of this.decor) {
       const dx = d.tx * TILE, dy = d.ty * TILE; if (!inView(dx, dy, d.type === 'h' ? 160 : 48)) continue;
       drawDecor(ctx, d, t, { closedGates: W.closedGates, game: this });
-      if (d.type === 'B') lights.push({ x: dx + 8, y: dy + 4, r: 80, a: 0.9, color: '#ffb347', glow: 0.22 });
-      else if (d.type === 'T') lights.push({ x: dx + 13, y: dy - 6, r: 84 + Math.sin(t * 9 + dx) * 4, a: 0.9, color: '#ffc060', glow: 0.22 });
+      if (d.type === 'B') { const lit = hearthLit(d, this); lights.push({ x: dx + 8, y: dy + 4, r: lit ? 80 : 36, a: lit ? 0.9 : 0.6, color: '#ffb347', glow: lit ? 0.22 : 0.08 }); }
+      else if (d.type === 'T') lights.push({ x: dx + 12, y: dy - 5, r: 84 + Math.sin(t * 9 + dx) * 4, a: 0.9, color: '#ffc060', glow: 0.22 });
       else if (d.type === '+') lights.push({ x: dx + 8, y: dy + 8, r: 44, a: 0.8, color: '#c9a0ff', glow: 0.2 });
       else if (d.type === 'L') lights.push({ x: dx + 8, y: dy + 8, r: 26, a: 0.6, color: '#8ce0ff', glow: 0.12 });
       else if (d.type === 'N' || d.type === 'Q' || d.type === 'W' || d.type === 'K') lights.push({ x: dx + 8, y: dy, r: 44, a: 0.7, color: d.type === 'K' ? '#8ce0ff' : '#ffd080', glow: 0.12 });

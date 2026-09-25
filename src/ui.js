@@ -70,24 +70,31 @@ class UI {
     if (p.soul > this.lastSoul) this.emberPulse = 0.3; this.lastSoul = p.soul;
     const shake = this.hpShake > 0 ? (Math.random() - 0.5) * 3 : 0;
     const lx = 30, ly = 30; c.save(); c.translate(shake, 0);
-    // lantern body
-    c.fillStyle = 'rgba(12,10,22,0.85)'; c.strokeStyle = '#8a7a5a'; c.lineWidth = 1.2; c.beginPath(); c.roundRect(lx - 8, ly - 11, 16, 22, 3); c.fill(); c.stroke();
-    c.fillStyle = '#6a5a3a'; c.fillRect(lx - 4, ly - 15, 8, 4); c.beginPath(); c.arc(lx, ly - 16, 3, Math.PI, 0); c.stroke();
-    const f = p.soul / PHYS.SOUL_MAX; const full = p.soul >= PHYS.SOUL_MAX;
-    c.save(); c.beginPath(); c.roundRect(lx - 6, ly - 9, 12, 18, 2); c.clip();
-    const eg = c.createLinearGradient(0, ly + 9 - f * 18, 0, ly + 9); eg.addColorStop(0, full ? '#fff4d0' : '#ffb347'); eg.addColorStop(1, '#ff6a2a'); c.fillStyle = eg; const wob = Math.sin(t * 6) * 0.6 + (this.emberPulse > 0 ? this.emberPulse * 3 : 0);
-    c.fillRect(lx - 6, ly + 9 - f * 18 - wob, 12, 18 + 4); c.restore();
-    if (full) { c.shadowColor = '#ffd080'; c.shadowBlur = 10 + Math.sin(t * 5) * 5; c.strokeStyle = 'rgba(255,220,150,0.8)'; c.lineWidth = 1; c.beginPath(); c.roundRect(lx - 8, ly - 11, 16, 22, 3); c.stroke(); c.shadowBlur = 0; }
-    else if (p.soul >= PHYS.SOUL_HEAL) { c.shadowColor = '#ffb347'; c.shadowBlur = 6; c.strokeStyle = 'rgba(255,180,100,0.5)'; c.beginPath(); c.roundRect(lx - 8, ly - 11, 16, 22, 3); c.stroke(); c.shadowBlur = 0; }
+    // lantern body (art/icon_lantern.svg, or a drawn one until it has loaded)
+    const art = Art.ready && Art.draw(c, 'icon_lantern', lx, ly, { scale: 0.9 });
+    if (!art) {
+      c.fillStyle = 'rgba(12,10,22,0.85)'; c.strokeStyle = '#8a7a5a'; c.lineWidth = 1.2; c.beginPath(); c.roundRect(lx - 8, ly - 11, 16, 22, 3); c.fill(); c.stroke();
+      c.fillStyle = '#6a5a3a'; c.fillRect(lx - 4, ly - 15, 8, 4); c.beginPath(); c.arc(lx, ly - 16, 3, Math.PI, 0); c.stroke();
+    }
+    const glass = art ? [lx - 5.7, ly - 7.5, 11.4, 16.8, 2.2] : [lx - 6, ly - 9, 12, 18, 2], body = art ? [lx - 6.3, ly - 8.1, 12.6, 18, 2.7] : [lx - 8, ly - 11, 16, 22, 3];
+    const f = p.soul / PHYS.SOUL_MAX; const full = p.soul >= PHYS.SOUL_MAX; const gb = glass[1] + glass[3], gh = glass[3];
+    c.save(); c.beginPath(); c.roundRect(...glass); c.clip();
+    const eg = c.createLinearGradient(0, gb - f * gh, 0, gb); eg.addColorStop(0, full ? '#fff4d0' : '#ffb347'); eg.addColorStop(1, '#ff6a2a'); c.fillStyle = eg; const wob = Math.sin(t * 6) * 0.6 + (this.emberPulse > 0 ? this.emberPulse * 3 : 0);
+    c.fillRect(glass[0] - 1, gb - f * gh - wob, glass[2] + 2, gh + 4); c.restore();
+    if (full) { c.shadowColor = '#ffd080'; c.shadowBlur = 10 + Math.sin(t * 5) * 5; c.strokeStyle = 'rgba(255,220,150,0.8)'; c.lineWidth = 1; c.beginPath(); c.roundRect(...body); c.stroke(); c.shadowBlur = 0; }
+    else if (p.soul >= PHYS.SOUL_HEAL) { c.shadowColor = '#ffb347'; c.shadowBlur = 6; c.strokeStyle = 'rgba(255,180,100,0.5)'; c.beginPath(); c.roundRect(...body); c.stroke(); c.shadowBlur = 0; }
     // petals fan out to the right of the lantern
     for (let i = 0; i < p.maxHp; i++) {
       const ang = -1.15 + i * (2.3 / Math.max(1, p.maxHp - 1)); const r = 24; const px = lx + 8 + Math.cos(ang * 0.55) * r * 0.9, py = ly + Math.sin(ang) * r;
       const alive = i < p.hp; const grow = alive && i === p.hp - 1 && this.petalGrow > 0 ? 1 + this.petalGrow * 0.6 : 1;
       c.save(); c.translate(px, py); c.rotate(ang * 0.55 + Math.PI / 2 + Math.sin(t * 2 + i) * 0.05); c.scale(grow, grow);
-      if (alive) { const pg = c.createLinearGradient(0, -6, 0, 6); pg.addColorStop(0, '#ffe2ec'); pg.addColorStop(1, '#ff7aa8'); c.fillStyle = pg; c.shadowColor = 'rgba(255,140,190,0.8)'; c.shadowBlur = 6; }
-      else { c.fillStyle = 'rgba(40,30,50,0.85)'; }
-      c.beginPath(); c.moveTo(0, -6.5); c.quadraticCurveTo(4.5, -2, 0, 6); c.quadraticCurveTo(-4.5, -2, 0, -6.5); c.fill();
-      c.shadowBlur = 0; c.strokeStyle = alive ? 'rgba(255,255,255,0.6)' : 'rgba(150,120,160,0.5)'; c.lineWidth = 0.7; c.stroke();
+      if (Art.ready && Art.has('icon_petal')) { if (alive) { c.shadowColor = 'rgba(255,140,190,0.8)'; c.shadowBlur = 6; } Art.draw(c, 'icon_petal', 0, 0, { scale: 0.85, alpha: alive ? 1 : 0.22 }); c.shadowBlur = 0; }
+      else {
+        if (alive) { const pg = c.createLinearGradient(0, -6, 0, 6); pg.addColorStop(0, '#ffe2ec'); pg.addColorStop(1, '#ff7aa8'); c.fillStyle = pg; c.shadowColor = 'rgba(255,140,190,0.8)'; c.shadowBlur = 6; }
+        else { c.fillStyle = 'rgba(40,30,50,0.85)'; }
+        c.beginPath(); c.moveTo(0, -6.5); c.quadraticCurveTo(4.5, -2, 0, 6); c.quadraticCurveTo(-4.5, -2, 0, -6.5); c.fill();
+        c.shadowBlur = 0; c.strokeStyle = alive ? 'rgba(255,255,255,0.6)' : 'rgba(150,120,160,0.5)'; c.lineWidth = 0.7; c.stroke();
+      }
       c.restore();
     }
     c.restore();
@@ -125,7 +132,8 @@ class UI {
     const c = this.ctx; const t = G.time; const W = this.W, H = this.H;
     c.fillStyle = 'rgba(4,3,12,0.55)'; c.fillRect(0, 0, W, H);
     const gl = 0.6 + Math.sin(t * 1.5) * 0.25;
-    this.glowText('GLIMMERDEEP', W / 2, H * 0.3, 40, '#fff4e0', `rgba(255,180,100,${gl})`);
+    if (Art.ready && Art.has('logo')) { c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(W / 2, H * 0.3, 0, W / 2, H * 0.3, 120); g.addColorStop(0, `rgba(255,170,90,${gl * 0.35})`); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); c.restore(); Art.draw(c, 'logo', W / 2, H * 0.3, { scale: Math.min(0.72, (W - 40) / 420) }); }
+    else this.glowText('GLIMMERDEEP', W / 2, H * 0.3, 40, '#fff4e0', `rgba(255,180,100,${gl})`);
     this.text('a spark against the hush', W / 2, H * 0.3 + 26, 11, '#e0d0c0', 'center', false, 0.9);
     const opts = G.hasSave ? ['Continue', 'New Game'] : ['New Game'];
     opts.forEach((o, i) => { const sel = i === this.menuIdx; this.text((sel ? '✦ ' : '') + o + (sel ? ' ✦' : ''), W / 2, H * 0.58 + i * 18, sel ? 13 : 11, sel ? '#ffffff' : '#9a92c0', 'center', sel); });

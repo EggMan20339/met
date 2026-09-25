@@ -13,8 +13,50 @@ function drawSpriteMaybeFlash(ctx, R, e, drawFn) {
 }
 const ABILITY_COLORS = { 1: '#5ad8ff', 2: '#8cff9a', 3: '#d49aff', 4: '#ffb347' };
 
-// ---------- Player: Mote, a small luminous spirit
+// ---------- Player: Mote, a small luminous spirit (illustrated poses from art/mote_*.svg; procedural fallback below)
+function motePose(p) {
+  if (p.sitting) return 'sit';
+  if (p.hurtTimer > 0) return 'hurt';
+  if (p.dashing > 0) return 'dash';
+  if (p.attackTimer > 0) return 'strike';
+  if (p.castTimer > 0.12) return 'cast';
+  if (p.focusing) return 'focus';
+  if (p.wallSliding) return 'cling';
+  if (!p.onGround) return p.vy < 0 ? 'jump' : 'fall';
+  if (Math.abs(p.vx) > 20) return 'run' + (1 + Math.floor(p.anim.run) % 4);
+  return 'idle';
+}
 function drawPlayer(ctx, p, t) {
+  if (p.dead) return;
+  if (!Art.ready || !Art.has('mote_idle')) return drawPlayerProc(ctx, p, t);
+  const cx = p.x + p.w / 2, feet = p.y + p.h;
+  ctx.save();
+  let alpha = 1;
+  if (p.hazardTimer > 0) alpha = clamp(p.hazardTimer / 0.55, 0, 1);
+  else if (p.invuln > 0 && p.flareCd < 1.8 && Math.floor(t * 28) % 2 === 0) alpha = 0.4;
+  const tail = p.anim.tail;
+  if (tail.length > 2) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 1; i < tail.length; i++) { const k = i / tail.length; ctx.globalAlpha = alpha * k * 0.22; ctx.fillStyle = '#cfd8ff'; ctx.beginPath(); ctx.arc(tail[i].x, tail[i].y, 2 + k * 3, 0, TAU); ctx.fill(); }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.globalAlpha = alpha;
+  const pose = motePose(p); const moving = p.onGround && Math.abs(p.vx) > 20;
+  const flip = pose === 'cling' ? p.wallDir > 0 : p.facing < 0; // the cling pose is drawn with the wall on its left
+  if (p.dashing > 0) for (let i = 1; i <= 3; i++) Art.draw(ctx, 'mote_dash', cx - p.dashDir * i * 7, feet, { flip, alpha: 0.3 - i * 0.07 });
+  let sx = 1, sy = 1;
+  if (!p.onGround && !p.wallSliding && !p.dashing) { sy = clamp(1 + Math.abs(p.vy) / 1600, 1, 1.15); sx = 1 / sy; }
+  if (p.anim.land > 0) { sx = 1 + p.anim.land * 0.25; sy = 1 - p.anim.land * 0.22; }
+  const bob = p.onGround && !moving && !p.sitting ? Math.sin(t * 3) * 0.5 : 0;
+  const lean = p.onGround ? clamp(p.vx / PHYS.RUN, -1, 1) * 0.06 : (p.wallSliding ? 0 : clamp(p.vx / 400, -0.12, 0.12));
+  ctx.translate(cx, feet); ctx.rotate(lean); ctx.scale(sx, sy);
+  ctx.globalCompositeOperation = 'lighter'; const gg = ctx.createRadialGradient(0, -12 + bob, 2, 0, -12 + bob, 16); gg.addColorStop(0, rgba(p.focusing || p.warm ? '#ffd080' : '#b8c4ff', p.focusing ? 0.45 : 0.22)); gg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(0, -12 + bob, 16, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+  Art.draw(ctx, 'mote_' + pose, 0, bob, { flip });
+  if (p.hurtTimer > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba('#ff5a5a', 0.3); ctx.beginPath(); ctx.ellipse(0, -12, 9, 12, 0, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
+  if (p.focusing) { const k = p.focusTimer / PHYS.FOCUS_TIME; ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = rgba('#ffe0a0', 0.5 + k * 0.4); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, -12, 15 - k * 8, 0, TAU); ctx.stroke(); ctx.globalCompositeOperation = 'source-over'; }
+  ctx.restore();
+}
+function drawPlayerProc(ctx, p, t) {
   if (p.dead) return;
   const cx = p.x + p.w / 2, feet = p.y + p.h;
   ctx.save();
@@ -57,11 +99,42 @@ function drawPlayer(ctx, p, t) {
   ctx.restore();
 }
 
-// ---------- Enemies
+// ---------- Enemies (illustrated from art/<creature>_<pose>.svg; the procedural bodies below are the fallback)
+function enemyPose(e) {
+  const mv = Math.abs(e.vx) > 5; const step = (hz) => (Math.floor(e.anim * hz) % 2 ? 'b' : 'a');
+  switch (e.type) {
+    case 'e': return 'dimling_' + (mv ? step(8) : 'a');
+    case 'f': return 'hushmoth_' + (Math.sin(e.anim * 22) > 0 ? 'up' : 'down');
+    case 's': return 'sporeling_' + (e.state === 'charge' ? 'charge' : 'idle');
+    case 'c': return e.state === 'charge' ? 'rootram_charge' : 'rootram_' + (mv ? step(7) : 'a');
+    case 'g': return 'snuffer_' + (e.state === 'idle' ? 'idle' : 'tele');
+    case 'a': return e.state === 'shell' ? 'emberback_shell' : 'emberback_' + (mv ? step(6) : 'a');
+    case 'r': return e.state === 'fire' && e.t < 0.3 ? 'gloamwing_fire' : 'gloamwing_' + (Math.sin(e.anim * 16) > 0 ? 'up' : 'down');
+    case 'j': return 'springfoot_' + (e.state === 'air' ? 'air' : e.state === 'land' || (e.state === 'wait' && e.t > 0.4) ? 'crouch' : 'idle');
+    case 'k': return 'husk_' + (e.state === 'swing_tele' || e.state === 'lunge_tele' ? 'swing_tele' : e.state === 'swing' ? (e.t < 0.3 ? 'swing' : 'idle') : e.state === 'lunge' ? 'lunge' : e.state === 'stagger' ? 'stagger' : mv ? 'walk_' + step(6) : 'idle');
+  }
+  return null;
+}
+function drawEnemyArt(c, e, pose, cx, cy, bottom, t) {
+  c.save(); const D = e.def; const flip = e.facing < 0;
+  let x = cx, y = D.ground ? bottom : cy;
+  if (e.state === 'tele' && (e.type === 'c' || e.type === 'g')) x += (Math.random() - 0.5) * 2;
+  if (e.type === 'k' && (e.state === 'swing_tele' || e.state === 'lunge_tele')) x += (Math.random() - 0.5) * 1.5;
+  let sx = 1, sy = 1;
+  if (e.type === 'j') { const sq = e.state === 'land' ? 1.25 : 1; sx = sq; sy = e.state === 'air' ? 1.15 : 1 / sq; }
+  if (e.type === 'g') { const sp = Math.hypot(e.vx, e.vy) || 1; for (let i = 1; i <= 4; i++) { c.fillStyle = rgba(D.color, 0.3 - i * 0.06); c.beginPath(); c.arc(cx - e.vx / sp * i * 3.5, cy - e.vy / sp * i * 3.5, 6 - i * 0.9, 0, TAU); c.fill(); } }
+  if (e.type === 's' && e.state === 'charge') { const k = clamp(e.t / 0.6, 0, 1); c.globalCompositeOperation = 'lighter'; c.fillStyle = rgba('#c8ff5a', 0.15 + k * 0.2); c.beginPath(); c.arc(cx, bottom - 12, 10 + k * 4, 0, TAU); c.fill(); c.globalCompositeOperation = 'source-over'; }
+  Art.draw(c, pose, x, y, { flip, sx, sy });
+  if (e.type === 'a' && e.state !== 'shell') { c.globalCompositeOperation = 'lighter'; c.fillStyle = rgba('#ff8a3c', 0.12 + Math.sin(e.anim * 4) * 0.08); c.beginPath(); c.ellipse(cx, bottom - 7, 8, 5, 0, 0, TAU); c.fill(); c.globalCompositeOperation = 'source-over'; }
+  if (e.type === 'r') { c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(176,160,255,0.2)'; c.beginPath(); c.arc(cx, cy, 8, 0, TAU); c.fill(); c.globalCompositeOperation = 'source-over'; }
+  if (e.type === 'k') { const a = e.state === 'swing' ? 40 : e.state === 'swing_tele' || e.state === 'lunge_tele' ? -70 : e.state === 'lunge' ? 10 : -25; const r = a * Math.PI / 180; const lx = cx + e.facing * (4 + Math.cos(r) * 14.5), ly = bottom - 15 + Math.sin(r) * 14.5; c.globalCompositeOperation = 'lighter'; const fl = 0.7 + Math.sin(t * 12) * 0.2; const lg = c.createRadialGradient(lx, ly, 0, lx, ly, 12); lg.addColorStop(0, rgba('#ffb347', 0.35 * fl)); lg.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = lg; c.fillRect(lx - 12, ly - 12, 24, 24); c.globalCompositeOperation = 'source-over'; }
+  c.restore();
+}
 function drawEnemy(ctx, R, e, t) {
   if (!e.alive) return;
   const D = e.def; const cx = e.x + e.w / 2, cy = e.y + e.h / 2, bottom = e.y + e.h;
-  const draw = (c) => {
+  const pose = Art.ready ? enemyPose(e) : null;
+  const draw = pose && Art.has(pose) ? (c) => drawEnemyArt(c, e, pose, cx, cy, bottom, t) : (c) => {
     c.save();
     switch (e.type) {
       case 'e': {
@@ -187,6 +260,12 @@ function drawLightless(ctx, R, b, t) {
     if (b.state === 'charge_tele' || b.state === 'roar' || b.state === 'beam_tele') c.translate((Math.random() - 0.5) * 3, 0);
     const squash = b.state === 'leap_tele' ? 0.82 : b.state === 'leap' ? 1.12 : b.state === 'slam' ? 0.88 : 1;
     c.scale(1 / squash, squash);
+    const name = b.state === 'charge_tele' || b.state === 'charge' ? 'lightless_charge' : b.state === 'leap_tele' || b.state === 'leap' || b.state === 'slam' ? 'lightless_leap' : b.state === 'stun' ? 'lightless_stun' : b.phase === 3 ? 'lightless_phase3' : b.phase >= 2 ? 'lightless_phase2' : 'lightless_idle';
+    if (Art.ready && Art.has(name)) {
+      Art.draw(c, name, 0, 0);
+      if (b.state === 'charge_tele' || b.state === 'roar' || b.state === 'beam_tele') { c.globalCompositeOperation = 'lighter'; c.fillStyle = rgba('#ff3a2a', 0.18 + Math.sin(t * 30) * 0.08); c.beginPath(); c.ellipse(0, -18, 34, 26, 0, 0, TAU); c.fill(); }
+      c.restore(); return;
+    }
     const mv = Math.abs(b.vx) > 5 ? 1 : 0;
     c.strokeStyle = '#1a1214'; c.lineWidth = 3; c.lineCap = 'round';
     for (let i = 0; i < 4; i++) { const ph = Math.sin(b.anim * 14 + i * 1.7) * 4 * mv; c.beginPath(); c.moveTo(-16 + i * 9, -10); c.lineTo(-20 + i * 10 + ph, 0); c.stroke(); }
@@ -217,6 +296,8 @@ function drawGulletroot(ctx, R, b, t) {
     c.translate(cx, floor); const rise = floor - b.y; // how far it has surfaced (0..h)
     c.translate(0, -(rise - b.h)); c.scale(b.facing, 1);
     if (b.state === 'thorns_tele' || b.state === 'emerge') c.translate((Math.random() - 0.5) * 2, 0);
+    const name = b.state === 'spit' || b.state === 'lash' ? 'gulletroot_open' : b.state === 'thorns_tele' ? 'gulletroot_tele' : 'gulletroot_closed';
+    if (Art.ready && Art.has(name)) { const open = name === 'gulletroot_open'; Art.draw(c, name, 0, 0, { sy: open ? 1.03 : 1 + Math.sin(t * 2) * 0.015 }); c.globalCompositeOperation = 'lighter'; c.fillStyle = rgba('#c8ff5a', 0.12 + (open ? 0.2 : 0)); c.beginPath(); c.ellipse(0, -22, 18, 8, 0, 0, TAU); c.fill(); c.restore(); return; }
     // roots fanning out
     c.strokeStyle = '#3a4a2a'; c.lineWidth = 5; c.lineCap = 'round';
     for (let i = -3; i <= 3; i++) { const sw = Math.sin(t * 1.5 + i) * 3; c.beginPath(); c.moveTo(i * 6, 0); c.quadraticCurveTo(i * 16 + sw, -20, i * 24 + sw * 2, -36 - Math.abs(i) * 2); c.stroke(); }
@@ -244,6 +325,8 @@ function drawBell(ctx, R, b, t) {
     c.save(); c.translate(cx, cy);
     if (b.state === 'toll_tele') c.translate((Math.random() - 0.5) * 4, 0);
     const tilt = b.state === 'stunned' ? 0.35 : Math.sin(b.anim * 1.2) * 0.08; c.rotate(tilt);
+    const name = b.state === 'toll_tele' || b.state === 'toll' ? 'bell_toll' : b.state === 'stunned' ? 'bell_stunned' : 'bell_hover';
+    if (Art.ready && Art.has(name)) { Art.draw(c, name, 0, 0, { sy: b.state === 'slam' ? 1.1 : 1 + Math.sin(b.anim * 3) * 0.02 }); c.globalCompositeOperation = 'lighter'; const pulse = b.state === 'toll_tele' ? 0.6 : 0.25 + Math.sin(t * 3) * 0.1; const cg = c.createRadialGradient(0, -6, 0, 0, -6, 14); cg.addColorStop(0, rgba('#ffffff', pulse)); cg.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = cg; c.beginPath(); c.arc(0, -6, 14, 0, TAU); c.fill(); c.restore(); return; }
     // tentacles
     c.lineCap = 'round'; for (let i = -3; i <= 3; i++) { const ph = b.anim * 2.2 + i; c.strokeStyle = rgba(i % 2 ? '#7fd7ff' : '#a0b8ff', 0.75); c.lineWidth = 1.6; c.beginPath(); c.moveTo(i * 5, 10); c.quadraticCurveTo(i * 6 + Math.sin(ph) * 5, 22, i * 5 + Math.sin(ph * 1.3) * 7, 34 + Math.abs(i) * -2); c.stroke(); }
     // bell body
@@ -278,8 +361,25 @@ function drawProjectile(ctx, pr, t) {
   ctx.restore();
 }
 
-// ---------- Pickups
+// ---------- Pickups (art/petal, heartwood, gift_*, heart; procedural fallback below)
+const GIFT_ART = { 1: 'gift_windstep', 2: 'gift_rootgrip', 3: 'gift_skyleaf', 4: 'gift_cinder' };
 function drawPickup(ctx, pk, t) {
+  if (pk.taken) return;
+  const name = pk.type === 'H' ? 'petal' : pk.type === 'S' ? 'heartwood' : pk.type === '*' ? 'heart' : GIFT_ART[pk.type];
+  if (!Art.ready || !name || !Art.has(name)) return drawPickupProc(ctx, pk, t);
+  const bob = Math.sin(t * 2.2 + pk.t) * 2; const x = pk.x, y = pk.y + bob;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  const col = pk.type === 'H' ? '#ff8ab0' : pk.type === 'S' ? '#ffbe5a' : pk.type === '*' ? '#ffd060' : ABILITY_COLORS[pk.type];
+  const pulse = pk.type === '*' ? 1 + Math.sin(t * 4) * 0.1 : pk.type === 'H' || pk.type === 'S' ? 1 : 1 + Math.sin(t * 3 + pk.t) * 0.06;
+  const gr = pk.type === '*' ? 28 : 18; const g = ctx.createRadialGradient(x, y, 0, x, y, gr * pulse); g.addColorStop(0, rgba(col, pk.type === '*' ? 0.6 : 0.45)); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(x - gr - 4, y - gr - 4, gr * 2 + 8, gr * 2 + 8);
+  if (pk.type === '*') { ctx.strokeStyle = 'rgba(255,232,160,0.6)'; ctx.lineWidth = 1.5; for (let i = 0; i < 2; i++) { const r = 8 + ((t * 20 + i * 8) % 16); ctx.globalAlpha = 1 - (r - 8) / 16; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke(); } ctx.globalAlpha = 1; }
+  else if (pk.type !== 'H' && pk.type !== 'S') { ctx.strokeStyle = rgba(col, 0.4); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, 11 + Math.sin(t * 2) * 1.5, 0, TAU); ctx.stroke(); }
+  ctx.globalCompositeOperation = 'source-over';
+  const rot = pk.type === 'H' ? Math.sin(t * 1.5 + pk.t) * 0.3 : pk.type === 'S' ? Math.sin(t + pk.t) * 0.15 : 0;
+  Art.draw(ctx, name, x, y, { rot, sx: pulse, sy: pulse });
+  ctx.restore();
+}
+function drawPickupProc(ctx, pk, t) {
   if (pk.taken) return;
   const bob = Math.sin(t * 2.2 + pk.t) * 2; const x = pk.x, y = pk.y + bob;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -311,8 +411,37 @@ function drawPickup(ctx, pk, t) {
   ctx.restore();
 }
 
-// ---------- Decor & characters
+// ---------- Decor & characters (art/hearth, lamp, crystal, house, wick, bramble, tallow, ringer, waystone, gate)
+function hearthLit(ent, game) {
+  if (!game) return true;
+  const x = ent.tx * TILE, y = ent.ty * TILE; const active = Math.abs(game.benchPos.x - (x + 3)) < 2 && Math.abs(game.benchPos.y - (y + TILE - PH)) < 2;
+  return active || game.benchesSeen.some((b) => b[0] === ent.tx && b[1] === ent.ty);
+}
+function drawDecorArt(ctx, ent, t, st) {
+  const x = ent.tx * TILE, y = ent.ty * TILE; const bx = x + 8, by = y + TILE;
+  const glowAt = (gx, gy, r, color, a) => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r); g.addColorStop(0, rgba(color, a)); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(gx - r, gy - r, r * 2, r * 2); ctx.restore(); };
+  switch (ent.type) {
+    case 'B': {
+      if (!Art.has('hearth') || !Art.has('hearth_cold')) return false;
+      const game = st.game; const active = game && Math.abs(game.benchPos.x - (x + 3)) < 2 && Math.abs(game.benchPos.y - (y + TILE - PH)) < 2;
+      if (hearthLit(ent, game)) { const fl = 0.8 + Math.sin(t * 9 + x) * 0.15; Art.draw(ctx, 'hearth', bx, by, { sy: (active ? 1.08 : 1) + Math.sin(t * 11) * 0.03, sx: 1 + Math.cos(t * 13) * 0.015 }); glowAt(bx, by - 9, 24, '#ffb347', 0.28 * fl); }
+      else { Art.draw(ctx, 'hearth_cold', bx, by); glowAt(bx, by - 6, 10, '#ff8a3c', 0.12 + Math.sin(t * 2 + x) * 0.05); }
+      return true;
+    }
+    case 'T': if (!Art.draw(ctx, 'lamp', bx, by)) return false; glowAt(x + 11, y - 4, 16, '#ffb347', 0.3 * (0.7 + Math.sin(t * 9 + x) * 0.2)); return true;
+    case '+': if (!Art.draw(ctx, 'crystal', bx, by)) return false; glowAt(bx, y + 6, 12, '#e6c8ff', 0.18 + Math.sin(t * 2 + x) * 0.08); return true;
+    case 'h': return Art.draw(ctx, 'house', x, by);
+    case 'N': return Art.draw(ctx, Math.sin(t * 2.5) > 0.75 ? 'wick_b' : 'wick_a', bx, by);
+    case 'W': { const br = Math.sin(t * 1.6) * 0.03; return Art.draw(ctx, 'bramble', bx, by, { sx: 1 + br, sy: 1 - br }); }
+    case 'Q': return Art.draw(ctx, 'tallow', bx, by);
+    case 'K': return Art.draw(ctx, 'ringer', bx, by - 3 + Math.sin(t * 1.3) * 2, { alpha: 0.82 });
+    case 'L': if (!Art.draw(ctx, 'waystone', bx, by)) return false; glowAt(bx, y + 8, 12, '#8ce0ff', 0.2 + Math.sin(t * 2 + x) * 0.1); return true;
+    case 'G': if (!Art.has('gate')) return false; if (st.closedGates && st.closedGates.has(ent.tx + ',' + ent.ty)) Art.draw(ctx, 'gate', x, y); return true;
+  }
+  return false;
+}
 function drawDecor(ctx, ent, t, st) {
+  if (Art.ready && drawDecorArt(ctx, ent, t, st)) return;
   const x = ent.tx * TILE, y = ent.ty * TILE; ctx.save();
   switch (ent.type) {
     case 'B': { // hearth: a stone ring with a living ember

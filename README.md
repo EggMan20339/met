@@ -1,6 +1,6 @@
 # Glimmerdeep
 
-*A spark against the hush.* A complete metroidvania in vanilla JavaScript on an HTML5 canvas: no build step, no dependencies, no downloaded assets. Every cave wall, creature, character, sound effect and piece of music is generated in code and drawn as smooth vectors at your screen's native resolution.
+*A spark against the hush.* A complete metroidvania in vanilla JavaScript on an HTML5 canvas: no build step, no dependencies, no downloaded assets. The cave walls, lighting, sound effects and music are generated in code; the characters, creatures, bosses, props and painted backgrounds are original vector illustrations (see [Artwork](#artwork)), all drawn at your screen's native resolution.
 
 Once, light poured down from the Hearthroot, the great sleeping tree, and the lamplighters of the Lanternry carried it into every tunnel of the Glimmerdeep. Then Sorrel, first of the lamplighters, grew afraid of the dark, built a lantern big enough to hold all the light at once, and climbed with it into the Cinderthroat. What remained was the hush: a quiet that eats warmth, and the things it leaves behind. You are **Mote**, the last spark Wick could coax from the embers.
 
@@ -53,6 +53,24 @@ Bramblehush ── Ember Cradle ── Rootshade (start) ── Fernwake ── 
 
 Cast: Wick the ember-keeper (Rootshade), Old Bramble the splinter-carver (Bramblehush), the Bell Ringer (Drownwell), Tallow the cartographer (the Lanternry). Waystones across the deep tell the rest.
 
+## Artwork
+
+Everything you see that is not rock is an original illustration in the game's own "Emberline" style: inky creatures each carrying one dimmed or stolen light, a luminous Mote with ember-leaf ears, three bosses, four friends, every pickup and prop, and two painted parallax layers per area. The style guide is `art/STYLE.md`.
+
+- `art/*.svg` are the finished pieces (92 of them) and `art/manifest.json` records each one's size and anchor.
+- `tools/art/*.js` are the editable sources. Each file is a small template (Mote's thirteen poses come from one pose table, every enemy from one function per creature) built on the helpers in `tools/art/lib.js`.
+- `src/artdata.js` is generated: the SVGs embedded as strings so the game works from `file://` with no loading of separate files. Do not edit it by hand.
+- `src/art.js` rasterises each illustration once per zoom level into an offscreen canvas and draws it in world units, so the art is as sharp at 4K as at 720p. Until the images have decoded (a few frames) every drawing routine falls back to its older procedural version, so nothing depends on the art being present.
+
+To change a piece, edit its template and regenerate:
+
+```
+node tools/make-art.js      # tools/art/*.js  ->  art/*.svg + art/manifest.json
+node tools/bundle-art.js    # art/*.svg       ->  src/artdata.js
+```
+
+`tools/art-sheet.html` (open it from a local server, `?scale=4` to enlarge) shows every asset on one contact sheet.
+
 ## Development
 
 Everything lives in `src/`:
@@ -63,8 +81,9 @@ Everything lives in `src/`:
 | `world.js` | Tile grid, collision queries, breakable walls, gates, areas. |
 | `player.js` | Movement feel: coyote time, input buffering, apex hang, wall slide, dash, bounce, rekindle, cinder, flare. |
 | `entities.js` | Nine enemy types, three boss state machines, projectiles, pickups. |
-| `render.js` | Organic vector terrain (traced outlines with rounded, jittered edges), per-area texture and rims, parallax backgrounds, half-resolution lighting. |
-| `sprites.js` | All creature, boss, character and pickup art. |
+| `render.js` | Organic vector terrain (traced outlines with rounded, jittered edges), per-area texture and rims, the painted parallax backgrounds, half-resolution lighting. |
+| `art.js` / `artdata.js` | The illustration loader and rasteriser, and the generated bundle of every SVG (see [Artwork](#artwork)). |
+| `sprites.js` | Chooses and draws the illustrated pose for the player, creatures, bosses, friends, pickups and props; keeps the procedural drawings as fallbacks. |
 | `audio.js` | Web Audio synth for effects and a generative ambient score per area. |
 | `ui.js` | Petal and lantern HUD, dialogue, boss cards, map, menus, intro and endings. |
 | `game.js` | State machine, fixed-step loop, camera, story flags, boss orchestration. |
