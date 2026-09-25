@@ -31,4 +31,7 @@ let fails = 0; const check = (name, ok) => { console.log((ok ? 'ok   ' : 'FAIL '
   check('holding rekindles a petal instead of casting', !castDuringHold && q.hp === 4 && q.soul === 65); }
 // 5. a full lantern absorbs a hit without losing a petal
 { const p = fresh(); p.soul = 100; const hp = p.hp; G.hurtPlayer(p, 1, p.x + 30, p.y); check('full lantern flares instead of losing a petal', p.hp === hp && p.soul === 0 && p.events.includes('flare')); }
+// 6. after landing, the player stays grounded every tick (no 1px hover / flicker)
+{ let flickers = 0, landings = 0; for (let k = 0; k < 40; k++) { const p = fresh(); p.x += k * 3; G.updatePlayer(p, inp({ jumpPressed: true, jump: true }), world, DT); for (let i = 0; i < 6 + (k % 9); i++) G.updatePlayer(p, inp({ jump: true, right: k % 2 === 0 }), world, DT); for (let i = 0; i < 90 && !p.onGround; i++) G.updatePlayer(p, inp({ right: k % 2 === 0 }), world, DT); if (!p.onGround) continue; landings++; for (let i = 0; i < 30; i++) { G.updatePlayer(p, NONE, world, DT); if (!p.onGround) { flickers++; break; } } }
+  check(`grounded state is stable after landing (${landings} landings, ${flickers} flickers)`, landings > 30 && flickers === 0); }
 console.log(fails ? `INPUT TEST FAILED (${fails})` : 'INPUT TEST OK'); process.exit(fails ? 1 : 0);

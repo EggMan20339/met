@@ -95,7 +95,7 @@ function updateEnemy(e, p, world, dt, ctx) {
         if (near && e.t > 1.1 && sign(dx) !== e.facing) { e.facing = sign(dx) || e.facing; e.t = 0; e.events.push('turn'); }
         e.vx = approach(e.vx, e.facing * D.speed * (near ? 1.6 : 1), 300 * dt);
       }
-      const hitX = moveX(e, e.vx * dt, world); if (hitX) { e.vx = 0; if (!e.t2 || e.t > 0.6) { e.facing *= -1; } }
+      const hitX = moveX(e, e.vx * dt, world); if (hitX) { e.vx = 0; e.facing *= -1; }
       const hitY = moveY(e, e.vy * dt, world); if (hitY > 0) e.vy = 0;
       const aheadX = e.facing > 0 ? e.x + e.w + 1 : e.x - 1;
       if (hitY > 0 && !world.rectSolid(aheadX, e.y + e.h + 1, 1, 1)) { e.facing *= -1; e.vx = 0; }
@@ -111,7 +111,7 @@ function updateEnemy(e, p, world, dt, ctx) {
       e.vx = approach(e.vx, dist2 > 6 ? Math.cos(ang) * sp : 0, 220 * dt); e.vy = approach(e.vy, dist2 > 6 ? Math.sin(ang) * sp : 0, 220 * dt);
       if (moveX(e, e.vx * dt, world)) e.vx *= -0.5; if (moveY(e, e.vy * dt, world)) e.vy *= -0.5;
       e.facing = dx < 0 ? -1 : 1;
-      if (e.aggro) { e.t += 0; if (e.t > 2.4) { e.t = 0; e.state = 'fire'; e.events.push('spit'); for (let i = 0; i < 2; i++) { const a = Math.atan2(dy, dx) + (i - 0.5) * 0.18; ctx.spawnProjectile({ x: ec.x + Math.cos(a) * 8, y: ec.y + Math.sin(a) * 8, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, r: 3.5, grav: 0, kind: 'gloam', life: 2.2, delay: i * 0.12 }); } } }
+      if (e.aggro) { if (e.t > 2.4) { e.t = 0; e.state = 'fire'; e.events.push('spit'); for (let i = 0; i < 2; i++) { const a = Math.atan2(dy, dx) + (i - 0.5) * 0.18; ctx.spawnProjectile({ x: ec.x + Math.cos(a) * 8, y: ec.y + Math.sin(a) * 8, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, r: 3.5, grav: 0, kind: 'gloam', life: 2.2, delay: i * 0.12 }); } } }
       break;
     }
     case 'j': { // springfoot: hops in arcs toward the player
@@ -186,8 +186,8 @@ function updateLightless(b, p, world, dt, ctx) {
   const D = b.def; const pc = pCenter(p), bc = eCenter(b); const dx = pc.x - bc.x, dy = pc.y - bc.y;
   const grounded = world.rectSolid(b.x, b.y + b.h, b.w, 1);
   const gravity = () => { b.vy = Math.min(b.vy + 1400 * dt, 520); };
-  if (b.hp <= D.phase3 && b.phase === 2) { b.phase = 3; b.state = 'roar'; b.t = 0; b.events.push('phase3'); }
-  if (b.hp <= D.phase2 && b.phase === 1) { b.phase = 2; b.state = 'roar'; b.t = 0; b.events.push('phase2'); }
+  if (b.hp <= D.phase3 && b.phase === 2) { b.phase = 3; b.state = 'roar'; b.t = 0; b.spat = false; b.events.push('phase3'); }
+  if (b.hp <= D.phase2 && b.phase === 1) { b.phase = 2; b.state = 'roar'; b.t = 0; b.spat = false; b.events.push('phase2'); }
   const speedMul = b.phase === 3 ? 1.3 : b.phase === 2 ? 1.2 : 1;
   b.vulnerable = !['intro', 'roar', 'blink'].includes(b.state);
   switch (b.state) {
@@ -224,7 +224,7 @@ function updateLightless(b, p, world, dt, ctx) {
     case 'blink': { // vanish, reappear beside the player, charge
       b.vx = 0; b.vy = 0;
       if (!b.spat) { b.spat = true; b.events.push('blink_out'); }
-      if (b.t > 0.7) { const side = Math.random() < 0.5 ? -1 : 1; const nx = clamp(pc.x + side * 150, ctx.arena.x + 30, ctx.arena.x + ctx.arena.w - 30 - b.w); b.x = nx; b.y = b.floorY - b.h; b.facing = sign(pc.x - (b.x + b.w / 2)) || 1; b.state = 'charge_tele'; b.t = 0.2; b.spat = false; b.events.push('blink_in'); }
+      if (b.t > 0.7) { const side = Math.random() < 0.5 ? -1 : 1; const nx = clamp(pc.x + side * 150, ctx.arena.x + 30, ctx.arena.x + ctx.arena.w - 30 - b.w); b.x = nx; b.y = b.floorY - b.h; b.facing = sign(pc.x - (b.x + b.w / 2)) || 1; b.state = 'charge_tele'; b.t = 0; b.spat = false; b.events.push('blink_in'); }
       break;
     }
     case 'beam_tele': gravity(); b.vx = 0; b.facing = sign(dx) || b.facing; if (b.t > 0.85) { b.state = 'beam'; b.t = 0; b.events.push('beam'); } break;
@@ -238,7 +238,7 @@ function updateLightless(b, p, world, dt, ctx) {
 }
 function updateGulletroot(b, p, world, dt, ctx) {
   const D = b.def; const pc = pCenter(p); const bc = eCenter(b); const dx = pc.x - bc.x;
-  if (b.hp <= D.phase2 && b.phase === 1) { b.phase = 2; b.state = 'submerge'; b.t = 0; b.events.push('phase2'); }
+  if (b.hp <= D.phase2 && b.phase === 1) { b.phase = 2; b.state = 'submerge'; b.t = 0; b.spat = false; b.events.push('phase2'); }
   const fast = b.phase === 2 ? 0.7 : 1;
   b.vulnerable = ['idle', 'thorns_tele', 'thorns', 'lash', 'spit', 'hurt'].includes(b.state);
   b.facing = sign(dx) || b.facing;
@@ -279,8 +279,8 @@ function updateGulletroot(b, p, world, dt, ctx) {
 }
 function updateBell(b, p, world, dt, ctx) {
   const D = b.def; const pc = pCenter(p); const bc = eCenter(b); const dx = pc.x - bc.x;
-  if (b.hp <= D.phase2 && b.phase === 1) { b.phase = 2; b.events.push('phase2'); b.state = 'toll_tele'; b.t = 0; }
-  const fast = b.phase === 2 ? 0.75 : 1; const hoverY = b.floorY - 96;
+  if (b.hp <= D.phase2 && b.phase === 1) { b.phase = 2; b.events.push('phase2'); b.state = 'toll_tele'; b.t = 0; b.spat = false; }
+  const fast = b.phase === 2 ? 0.75 : 1; const hoverY = b.floorY - 84;
   b.vulnerable = !['intro'].includes(b.state);
   b.facing = sign(dx) || b.facing;
   const drift = (target, sp) => { b.vx = approach(b.vx, clamp(target - bc.x, -1, 1) * sp, 200 * dt); };
@@ -301,13 +301,13 @@ function updateBell(b, p, world, dt, ctx) {
     case 'toll': if (b.t > 0.9) { b.state = 'hover'; b.t = 0; } break;
     case 'slam_tele': { drift(pc.x, 150); b.y = approach(b.y, hoverY - 40, 140 * dt); if (b.t > 0.55) { b.state = 'slam'; b.t = 0; b.vx = 0; b.events.push('dive'); } break; }
     case 'slam': {
-      b.vy = Math.min(b.vy + 2600 * dt, 640); const ny = b.y + b.vy * dt;
-      if (ny + b.h >= b.floorY) { b.y = b.floorY - b.h; b.vy = 0; b.state = 'stunned'; b.t = 0; b.events.push('slam'); ctx.spawnProjectile({ x: b.x - 4, y: b.floorY - 6, vx: -200, vy: 0, r: 6, grav: 0, kind: 'shock', life: 1.4 }); ctx.spawnProjectile({ x: b.x + b.w + 4, y: b.floorY - 6, vx: 200, vy: 0, r: 6, grav: 0, kind: 'shock', life: 1.4 }); }
-      else b.y = ny;
+      b.vy = Math.min(b.vy + 2600 * dt, 640);
+      const hit = moveY(b, b.vy * dt, world);
+      if (hit > 0 || b.y + b.h >= b.floorY) { if (b.y + b.h > b.floorY) b.y = b.floorY - b.h; const ground = b.y + b.h; b.vy = 0; b.state = 'stunned'; b.t = 0; b.events.push('slam'); ctx.spawnProjectile({ x: b.x - 4, y: ground - 6, vx: -200, vy: 0, r: 6, grav: 0, kind: 'shock', life: 1.4 }); ctx.spawnProjectile({ x: b.x + b.w + 4, y: ground - 6, vx: 200, vy: 0, r: 6, grav: 0, kind: 'shock', life: 1.4 }); }
       break;
     }
     case 'stunned': b.vx = 0; if (b.t > (b.phase === 2 ? 1.1 : 1.5)) { b.state = 'rise'; b.t = 0; } break;
-    case 'rise': b.y = approach(b.y, hoverY, 160 * dt); if (Math.abs(b.y - hoverY) < 2) { b.state = 'hover'; b.t = 0; } break;
+    case 'rise': { const ny = approach(b.y, hoverY, 160 * dt); if (!world.rectSolid(b.x, ny, b.w, b.h)) b.y = ny; else b.y = hoverY; if (Math.abs(b.y - hoverY) < 2) { b.state = 'hover'; b.t = 0; } break; }
     case 'rain_tele': {
       b.vx = approach(b.vx, 0, 300 * dt);
       if (!b.spat) { b.spat = true; const n = b.phase === 2 ? 7 : 5; b.spots = []; for (let i = 0; i < n; i++) b.spots.push(ctx.arena.x + 20 + (ctx.arena.w - 40) * (i + Math.random() * 0.6) / n); b.events.push('rain_tele'); }

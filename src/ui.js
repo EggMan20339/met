@@ -35,7 +35,7 @@ class UI {
   }
   text(str, x, y, size, color = '#fff', align = 'left', bold = false, alpha = 1, font = UI_FONT) {
     const c = this.ctx; c.save(); c.globalAlpha = alpha; c.font = `${bold ? 'bold ' : ''}${size}px ${font}`; c.textAlign = align; c.textBaseline = 'middle';
-    c.shadowColor = 'rgba(0,0,0,0.8)'; c.shadowBlur = 3; c.shadowOffsetY = 1; c.fillStyle = color; c.fillText(str, x, y); c.restore();
+    c.fillStyle = 'rgba(0,0,0,0.7)'; c.fillText(str, x + 0.6, y + 0.9); c.fillStyle = color; c.fillText(str, x, y); c.restore(); // cheap offset shadow instead of shadowBlur
   }
   glowText(str, x, y, size, color, glow, align = 'center', bold = true) {
     const c = this.ctx; c.save(); c.font = `${bold ? 'bold ' : ''}${size}px ${UI_FONT}`; c.textAlign = align; c.textBaseline = 'middle';
@@ -138,8 +138,8 @@ class UI {
     const c = this.ctx; const it = this.intro; const W = this.W, H = this.H;
     c.fillStyle = '#05040c'; c.fillRect(0, 0, W, H);
     if (!it) return;
-    const page = it.pages[it.i]; const k = clamp(it.t / 1.2, 0, 1); const fade = it.leaving ? clamp(1 - (it.t - it.leaveAt) / 0.6, 0, 1) : 1;
-    c.globalAlpha = k * fade;
+    const page = it.pages[it.i]; const k = clamp(it.t / 1.2, 0, 1);
+    c.globalAlpha = k;
     // an ember drifting up behind the words
     c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(W / 2, H * 0.62 - it.t * 6, 0, W / 2, H * 0.62 - it.t * 6, 60); g.addColorStop(0, 'rgba(255,170,90,0.25)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); c.restore();
     const lines = []; for (const para of page) lines.push(...this.wrap(para, Math.min(360, W - 60), 11), '');

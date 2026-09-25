@@ -22,7 +22,7 @@ const MAP = {
   cameraLocks: [[240, 0, 48, 17], [224, 70, 48, 26], [0, 116, 70, 28]],
   bossArenas: [
     { id: 'gulletroot', spawn: 'Y', rect: [229, 74, 38, 17], trigger: [232, 74, 27, 17], name: 'GULLETROOT', sub: 'the hunger beneath the ferns', reward: '1' },
-    { id: 'bell', spawn: 'Z', rect: [2, 119, 56, 21], trigger: [2, 122, 56, 18], name: 'THE DROWNED BELL', sub: 'it rings for no one now', reward: '2' },
+    { id: 'bell', spawn: 'Z', rect: [2, 119, 56, 19], trigger: [2, 122, 56, 18], name: 'THE DROWNED BELL', sub: 'it rings for no one now', reward: '2' },
     { id: 'lightless', spawn: 'X', rect: [243, 4, 38, 12], trigger: [243, 4, 34, 12], name: 'THE LIGHTLESS', sub: 'what Sorrel became', reward: '*' },
   ],
   rooms: [
@@ -199,10 +199,10 @@ const MAP = {
       R(5) + R(38, '.') + R(5),
       R(5) + R(38, '.') + R(5),
       R(5) + R(38, '.') + R(5),
-      R(5) + R(35, '.') + '.1.' + R(4, '.') + '#',
-      R(4, '.') + 'G' + R(35, '.') + '###' + R(4, '.') + '#',
-      R(4, '.') + 'G' + R(35, '.') + '###' + R(4, '.') + '#',
-      '..T.' + 'G' + '.T' + R(19, '.') + 'Y' + R(13, '.') + '###' + '.T..' + '#',
+      R(5) + R(35, '.') + '.1.' + 'G...' + '#',
+      R(4, '.') + 'G' + R(35, '.') + '###' + 'G...' + '#',
+      R(4, '.') + 'G' + R(35, '.') + '###' + 'G...' + '#',
+      '..T.' + 'G' + '.T' + R(19, '.') + 'Y' + R(13, '.') + '###' + 'GT..' + '#',
       R(44) + '===' + '#',
       R(48), R(48), R(48), R(48),
     ] },

@@ -15,6 +15,12 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
   // --- death & respawn
   await page.evaluate(() => { const g = window.game; g.player.x += 200; g.player.hp = 1; g.player.invuln = 0; g.player.soul = 0; hurtPlayer(g.player, 5, g.player.x + 5, g.player.y); });
   await page.waitForTimeout(400); const dead = await st(); await page.waitForTimeout(2500); const respawned = await st();
+  // --- dying inside an arena must fully end the fight: no boss, open gates, normal music after respawn
+  await page.evaluate(() => { const g = window.game, p = g.player; p.x = 226 * 16; p.y = 89 * 16 + 16 - p.h; p.vx = 0; p.vy = 0; p.invuln = 0; g.cam.x = p.x - 200; g.cam.y = p.y - 120; });
+  await page.keyboard.down('ArrowRight'); await page.waitForTimeout(1500); await page.keyboard.up('ArrowRight'); await page.waitForTimeout(1500);
+  const inArena = await st();
+  await page.evaluate(() => { const g = window.game, p = g.player; p.hp = 1; p.soul = 0; p.invuln = 0; hurtPlayer(p, 5, p.x + 5, p.y); });
+  await page.waitForTimeout(3200); const afterArenaDeath = await page.evaluate(() => { const g = window.game; return { state: g.state, boss: !!g.boss, gates: g.world.closedGates.size, bossMusic: g.audio.boss, x: Math.round(g.player.x), benchX: Math.round(g.benchPos.x) }; });
   const results = {};
   const fight = async (name, tx, ty, dir, shotName) => {
     // clear any lingering fight and teleport in the same evaluate, so no game frame can re-trigger the old arena in between
@@ -41,8 +47,9 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
   // collect the Great Lantern's heart → ending
   for (let i = 0; i < 60; i++) { const s = await page.evaluate(() => { const g = window.game, p = g.player; const h = g.pickups.find((k) => k.type === '*'); if (!h || h.taken) return { done: true, state: g.state }; return { dx: h.x - (p.x + p.w / 2), dy: h.y - (p.y + p.h / 2), visible: h.visible }; }); if (s.done) break; const dir = s.dx > 0 ? 'ArrowRight' : 'ArrowLeft'; await page.keyboard.down(dir); if (s.dy < -10) await page.keyboard.press('Space'); await page.waitForTimeout(120); await page.keyboard.up(dir); }
   await page.waitForTimeout(4500); await page.screenshot({ path: path.join(outDir, '10-ending.png') }); const ending = await st();
-  console.log(JSON.stringify({ dead: dead.state, respawned: { state: respawned.state, hp: respawned.hp, atBench: Math.abs(respawned.x - respawned.benchX) < 2 }, results, ending: ending.state, errors }, null, 1));
+  console.log(JSON.stringify({ dead: dead.state, respawned: { state: respawned.state, hp: respawned.hp, atBench: Math.abs(respawned.x - respawned.benchX) < 2 }, inArena: !!inArena.boss, afterArenaDeath, results, ending: ending.state, errors }, null, 1));
   await browser.close(); server.close();
-  const ok = dead.state === 'dead' && respawned.state === 'play' && respawned.hp === 5 && Math.abs(respawned.x - respawned.benchX) < 2 && Object.values(results).every((r) => r.ok) && ending.state === 'ending' && errors.length === 0;
+  const arenaDeathOk = !!inArena.boss && afterArenaDeath.state === 'play' && !afterArenaDeath.boss && afterArenaDeath.gates === 0 && !afterArenaDeath.bossMusic && Math.abs(afterArenaDeath.x - afterArenaDeath.benchX) < 2;
+  const ok = dead.state === 'dead' && respawned.state === 'play' && respawned.hp === 5 && Math.abs(respawned.x - respawned.benchX) < 2 && arenaDeathOk && Object.values(results).every((r) => r.ok) && ending.state === 'ending' && errors.length === 0;
   console.log(ok ? 'BOSS TEST OK' : 'BOSS TEST FAILED'); process.exit(ok ? 0 : 1);
 })().catch((e) => { console.error(e); process.exit(1); });

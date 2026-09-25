@@ -77,7 +77,7 @@ class Game {
       (save.collected || []).forEach((id) => this.collected.add(id)); this.pickups.forEach((pk) => { if (this.collected.has(pk.id)) pk.taken = true; });
       W.applyBroken(save.broken || []); this.deaths = save.deaths || 0; this.playtime = save.playtime || 0;
       for (const id of (save.arenasDone || [])) { const a = this.arenas.find((x) => x.id === id); if (a) a.done = true; }
-      if (save.bench) { this.benchPos = { x: save.bench.x, y: save.bench.y }; p.x = save.bench.x; p.y = save.bench.y; }
+      if (save.bench && Number.isFinite(save.bench.x) && Number.isFinite(save.bench.y)) { this.benchPos = { x: save.bench.x, y: save.bench.y }; p.x = save.bench.x; p.y = save.bench.y; }
       if (save.explored) { const arr = save.explored; for (let i = 0; i < Math.min(arr.length, this.explored.length); i++) this.explored[i] = arr[i]; }
       this.benchesSeen = save.benchesSeen || []; this.flags = save.flags || {}; this.heartwood = save.heartwood || 0; this.heartwoodUsed = save.heartwoodUsed || 0;
     }
@@ -95,7 +95,7 @@ class Game {
     saveGame({ abilities: p.abilities, maxHp: p.maxHp, damage: p.damage, collected: [...this.collected], broken: this.world.brokenWalls, bench: this.benchPos, arenasDone: this.arenas.filter((a) => a.done).map((a) => a.id), deaths: this.deaths, playtime: this.playtime, explored: Array.from(this.explored), benchesSeen: this.benchesSeen, flags: this.flags, heartwood: this.heartwood, heartwoodUsed: this.heartwoodUsed });
     this.hasSave = true;
   }
-  newGame() { clearSave(); this.world = new World(MAP); this.renderer = new Renderer(this.world); this.renderer.setSize(this.canvas.width, this.canvas.height, this.zoom); this.explored.fill(0); this.benchesSeen = []; this.deaths = 0; this.playtime = 0; this.setupWorld(null); this.fx = new FX(); }
+  newGame() { clearSave(); this.audio.setBoss(false); this.darkPhase = false; this.world = new World(MAP); this.renderer = new Renderer(this.world); this.renderer.setSize(this.canvas.width, this.canvas.height, this.zoom); this.explored.fill(0); this.benchesSeen = []; this.deaths = 0; this.playtime = 0; this.setupWorld(null); this.fx = new FX(); }
   // ---------- main loop
   frame(t) {
     requestAnimationFrame((tt) => this.frame(tt));
@@ -105,7 +105,7 @@ class Game {
     this.audio.resume();
     this.time += dtReal;
     this.adaptQuality(dtReal);
-    const STEP = 1 / 60; this.acc += dtReal * this.fx.slowmo; let steps = 0;
+    const STEP = 1 / 60; this.acc += dtReal * (this.state === 'play' ? this.fx.slowmo : 1); let steps = 0;
     while (this.acc >= STEP && steps < 5) { this.tick(STEP); this.acc -= STEP; steps++; }
     if (this.acc > STEP * 5) this.acc = STEP * 5;
     this.ui.update(dtReal, this.audioStarted ? this.audio : null);
@@ -148,8 +148,8 @@ class Game {
   }
   tickIntro() {
     const inp = this.input; const it = this.ui.intro;
-    if (inp.isPressed('pause') || inp.isPressed('back')) { this.ui.intro = null; this.startPlay(); return; }
     if ((inp.isPressed('jump') || inp.isPressed('confirm')) && it && it.t > 0.6) { it.i++; it.t = 0; this.audio.play('ui'); if (it.i >= it.pages.length) { this.ui.intro = null; this.startPlay(); } }
+    else if (inp.isPressed('pause')) { this.ui.intro = null; this.startPlay(); }
   }
   startPlay() {
     this.state = 'play'; this.audio.play('ui'); this.ui.showArea(this.world.areaInfo(this.area).name);
@@ -175,7 +175,7 @@ class Game {
     // warmth: rekindling is quicker beside a hearth, a lamp or a chime crystal
     p.warm = false; for (const d of this.decor) { if (d.type !== 'B' && d.type !== 'T' && d.type !== '+') continue; const dx = d.tx * TILE + 8 - pc0.x, dy = d.ty * TILE + 4 - pc0.y; if (dx * dx + dy * dy < 70 * 70) { p.warm = true; break; } }
     updatePlayer(p, inp, W, dt);
-    for (const ev of p.events) this.handlePlayerEvent(ev);
+    for (const ev of p.events) this.handlePlayerEvent(ev); p.events.length = 0;
     // interactables
     this.nearInteract = null; const pc = pCenter(p);
     for (const d of this.decor) {
@@ -187,7 +187,7 @@ class Game {
     const tail = p.anim.tail; tail.push({ x: pc.x, y: pc.y }); if (tail.length > 9) tail.shift();
     if (Math.abs(p.vx) < 5 && Math.abs(p.vy) < 5) tail.length = 0;
     if (p.onGround && Math.abs(p.vx) > 100 && Math.random() < 0.25) fx.dust(pc.x - p.facing * 4, p.y + p.h, 1, -p.facing);
-    if (p.onGround && Math.abs(p.vx) > 100 && Math.floor(p.anim.run) !== Math.floor(p.anim.run - dt * Math.abs(p.vx) / 14)) this.audio.play('step');
+    if (p.onGround && Math.abs(p.vx) > 100 && Math.floor(p.anim.run / 4) !== Math.floor((p.anim.run - dt * Math.abs(p.vx) / 14) / 4)) this.audio.play('step');
     if (p.wallSliding && Math.random() < 0.4) fx.dust(p.x + (p.wallDir > 0 ? p.w : 0), p.y + p.h - 2, 1, 0);
     if (p.dashing > 0) fx.add({ x: pc.x, y: pc.y, vx: -p.dashDir * 30, vy: rand(-20, 20), life: 0.3, size: 3, color: '#cfe0ff', glow: true });
     if (p.focusing && Math.random() < 0.6) fx.add({ x: pc.x + rand(-20, 20), y: pc.y + rand(-16, 16), vx: 0, vy: -22, life: 0.6, size: 1.6, color: p.warm ? '#ffd080' : '#ffe0a0', glow: true });
@@ -200,8 +200,8 @@ class Game {
       updateEnemy(e, p, W, dt, ctxE);
       for (const ev of e.events) this.handleEnemyEvent(e, ev);
       if (p.invuln <= 0 && !p.dead) {
-        if (aabb(p, e)) { if (hurtPlayer(p, e.def.dmg, ec.x, ec.y)) this.onPlayerHurt(); }
-        else if (e.hitbox && aabb(p, e.hitbox)) { if (hurtPlayer(p, e.hitbox.dmg, ec.x, ec.y)) this.onPlayerHurt(); }
+        if (aabb(p, e)) hurtPlayer(p, e.def.dmg, ec.x, ec.y);
+        else if (e.hitbox && aabb(p, e.hitbox)) hurtPlayer(p, e.hitbox.dmg, ec.x, ec.y);
       }
     }
     // boss
@@ -209,10 +209,10 @@ class Game {
       const b = this.boss; updateBoss(b, p, W, dt, ctxE);
       for (const ev of b.events) this.handleBossEvent(b, ev);
       if (b.alive && p.invuln <= 0 && !p.dead) {
-        const body = b.kind === 'bell' ? { x: b.x + 6, y: b.y + 4, w: b.w - 12, h: b.h - 6 } : b.kind === 'gulletroot' ? { x: b.x + 10, y: b.y + 6, w: b.w - 20, h: b.h - 6 } : { x: b.x + 4, y: b.y + 4, w: b.w - 8, h: b.h - 4 };
+        const body = b.kind === 'bell' ? { x: b.x + 8, y: b.y + 2, w: b.w - 16, h: b.h - 18 } : b.kind === 'gulletroot' ? { x: b.x + 10, y: b.y + 6, w: b.w - 20, h: b.h - 6 } : { x: b.x + 4, y: b.y + 4, w: b.w - 8, h: b.h - 4 };
         const touch = b.kind === 'gulletroot' ? (b.state !== 'submerge' && b.state !== 'emerge' && aabb(p, body)) : aabb(p, body);
         const hb = b.hitboxes.find((h) => aabb(p, h));
-        if (touch || hb) { if (hurtPlayer(p, (b.kind === 'lightless' && b.state === 'charge' && b.phase >= 2) ? 2 : (hb ? hb.dmg : 1), eCenter(b).x, eCenter(b).y)) this.onPlayerHurt(); }
+        if (touch || hb) hurtPlayer(p, hb ? hb.dmg : 1, eCenter(b).x, eCenter(b).y);
       }
       if (!b.alive) this.tickBossDeath(b, dt);
     }
@@ -221,9 +221,12 @@ class Game {
       const ok = updateProjectile(pr, W, dt);
       if (!ok) { if (pr.kind !== 'ring' && pr.kind !== 'thorn') fx.burst(pr.x, pr.y, 5, { speed: 40, life: 0.3, size: 1.5, color: pr.kind === 'shock' ? '#ff9a4a' : pr.kind === 'bolt' ? '#ffd080' : pr.kind === 'drop' ? '#8ce0ff' : '#c8ff5a', glow: true }); return false; }
       if (pr.kind === 'bolt') return this.resolveBolt(pr);
-      if (p.invuln <= 0 && !p.dead && projectileHits(pr, p)) { if (hurtPlayer(p, 1, pr.x, pr.y)) { this.onPlayerHurt(); return pr.kind === 'ring' || pr.kind === 'thorn' || pr.kind === 'vine'; } }
+      if (p.invuln <= 0 && !p.dead && projectileHits(pr, p)) { if (hurtPlayer(p, 1, pr.x, pr.y)) return pr.kind === 'ring' || pr.kind === 'thorn' || pr.kind === 'vine'; }
       return true;
     });
+    if (this.clearProjectiles) { this.projectiles = []; this.clearProjectiles = false; }
+    // events raised by hits taken this tick (hurt, flare, die)
+    for (const ev of p.events) this.handlePlayerEvent(ev); p.events.length = 0;
     // pickups
     for (const pk of this.pickups) {
       pk.t += dt; if (pk.taken || !pk.visible) continue;
@@ -232,7 +235,7 @@ class Game {
     }
     // boss arena triggers
     const ptx = Math.floor(pc.x / TILE), pty = Math.floor(pc.y / TILE);
-    if (!this.boss) for (const a of this.arenas) if (!a.done && W.inRect(ptx, pty, a.trigger) && p.onGround) { this.startBoss(a); break; }
+    if (!this.boss && !p.dead) for (const a of this.arenas) if (!a.done && W.inRect(ptx, pty, a.trigger) && p.onGround) { this.startBoss(a); break; }
     // area change
     const area = W.areaAt(ptx, pty);
     if (area !== this.area) { this.area = area; this.ui.showArea(W.areaInfo(area).name); if (!this.boss) this.audio.setArea(area); }
@@ -277,6 +280,7 @@ class Game {
     if (this.boss) this.endBoss(false);
   }
   respawn() {
+    if (this.boss) this.endBoss(false);
     const p = this.player; const keep = { abilities: p.abilities, maxHp: p.maxHp, damage: p.damage };
     Object.assign(p, makePlayer(this.benchPos.x, this.benchPos.y)); p.abilities = keep.abilities; p.maxHp = keep.maxHp; p.damage = keep.damage; p.hp = p.maxHp; p.soul = 0;
     this.spawnEnemies(); this.projectiles = []; this.state = 'play'; this.fadeAlpha = 1;
@@ -347,7 +351,7 @@ class Game {
       case 'stagger': fx.glowBurst(ec.x, ec.y, 10, ['#ffd080'], 60, 0.4); break;
     }
   }
-  summonMinions(type) { const a = this.bossArena; if (!a) return; const spots = [[a.rect[0] + 3, a.rect[1] + a.rect[3] - 2], [a.rect[0] + a.rect[2] - 4, a.rect[1] + a.rect[3] - 2]]; for (const [tx, ty] of spots) { const e = makeEnemy({ type, tx, ty, id: 'minion_' + Math.random() }); e.summoned = true; this.enemies.push(e); this.fx.glowBurst(e.x + 7, e.y + 5, 10, ['#ff8a3c', '#ffffff'], 60, 0.5); } }
+  summonMinions(type) { const a = this.bossArena; if (!a) return; const W = this.world; const floorRow = Math.floor((this.boss ? this.boss.floorY : (a.rect[1] + a.rect[3]) * TILE) / TILE); const airRow = (tx) => { let ty = floorRow - 1; while (ty > a.rect[1] && W.isSolid(tx, ty)) ty--; return ty; }; const spots = [[a.rect[0] + 3, airRow(a.rect[0] + 3)], [a.rect[0] + a.rect[2] - 4, airRow(a.rect[0] + a.rect[2] - 4)]]; for (const [tx, ty] of spots) { const e = makeEnemy({ type, tx, ty, id: 'minion_' + Math.random() }); e.summoned = true; this.enemies.push(e); this.fx.glowBurst(e.x + 7, e.y + 5, 10, ['#ff8a3c', '#ffffff'], 60, 0.5); } }
   handleBossEvent(b, ev) {
     const bc = eCenter(b), fx = this.fx, A = this.audio;
     if (ev === 'roar') { A.play(b.kind === 'bell' ? 'bell' : 'roar'); fx.shake(5, 0.8); }
@@ -379,7 +383,7 @@ class Game {
   endBoss(won) { this.world.openGates(); this.audio.setBoss(false); this.audio.setArea(this.area); this.darkPhase = false; if (!won) { this.boss = null; this.bossArena = null; } this.enemies = this.enemies.filter((e) => !e.summoned); }
   onBossKilled() {
     const b = this.boss; this.audio.play('bossdeath'); this.fx.stop(0.3); this.fx.slow(0.35, 1.6); this.fx.shake(10, 1.5); this.fx.doFlash(0.8, '#ffffff');
-    this.bossArena.done = true; this.endBoss(true); this.projectiles = []; this.flags['slew_' + this.bossArena.id] = true; this.persist();
+    this.bossArena.done = true; this.endBoss(true); this.clearProjectiles = true; this.flags['slew_' + this.bossArena.id] = true; this.persist();
   }
   tickBossDeath(b, dt) {
     const bc = eCenter(b);

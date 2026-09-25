@@ -53,9 +53,9 @@ function buildLoop(pts, r, jitter) {
   const P = pts.map((p, i) => {
     const prevSeg = pts[(i + n - 1) % n]; const cut = p.kind === 'cut' || prevSeg.kind === 'cut';
     const h1 = hash2(p.x * 3 + 1, p.y * 5 + 2) - 0.5, h2 = hash2(p.x * 7 + 3, p.y * 11 + 5) - 0.5;
-    let x = p.x * TILE + h1 * 2 * jitter, y = p.y * TILE + h2 * 2 * jitter;
+    let x = p.x * TILE + h1 * 2 * jitter, y = p.y * TILE + h2 * 2 * jitter; const ux = x, uy = y;
     if (cut) { const o = p.kind === 'cut' ? p.off : prevSeg.off; x += o.x * 1.5; y += o.y * 1.5; }
-    return { x, y, kind: p.kind, cut };
+    return { x, y, ux, uy, kind: p.kind, cut };
   });
   const corner = (i) => {
     const a = P[(i + n - 1) % n], bb = P[i], c = P[(i + 1) % n];
@@ -66,12 +66,14 @@ function buildLoop(pts, r, jitter) {
   const C = P.map((_, i) => corner(i));
   const path = new Path2D(), floor = new Path2D(), ceil = new Path2D(), rim = new Path2D();
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity; let anyCut = false;
+  // sub-paths (rims, floors, ceilings) end exactly on the chunk boundary, not on the nudged fill vertex, so neighbours do not double-stroke
+  const U = (i) => (P[i].cut ? { x: P[i].ux, y: P[i].uy } : null);
   for (let i = 0; i < n; i++) {
     const bb = P[i], [p1, p2] = C[i]; minX = Math.min(minX, bb.x); minY = Math.min(minY, bb.y); maxX = Math.max(maxX, bb.x); maxY = Math.max(maxY, bb.y);
     if (i === 0) path.moveTo(p2.x, p2.y); else { path.lineTo(p1.x, p1.y); path.quadraticCurveTo(bb.x, bb.y, p2.x, p2.y); }
-    const q1 = C[(i + 1) % n][0];
-    if (bb.kind === 'floor') { floor.moveTo(p2.x, p2.y); floor.lineTo(q1.x, q1.y); }
-    else if (bb.kind === 'ceil') { ceil.moveTo(p2.x, p2.y); ceil.lineTo(q1.x, q1.y); }
+    const s0 = U(i) || p2, s1 = U((i + 1) % n) || C[(i + 1) % n][0];
+    if (bb.kind === 'floor') { floor.moveTo(s0.x, s0.y); floor.lineTo(s1.x, s1.y); }
+    else if (bb.kind === 'ceil') { ceil.moveTo(s0.x, s0.y); ceil.lineTo(s1.x, s1.y); }
     if (bb.kind === 'cut') anyCut = true;
   }
   path.lineTo(C[0][0].x, C[0][0].y); path.quadraticCurveTo(P[0].x, P[0].y, C[0][1].x, C[0][1].y); path.closePath();
@@ -82,8 +84,8 @@ function buildLoop(pts, r, jitter) {
     for (let k = 1; k <= n; k++) {
       const i = (s0 + k) % n; const bb = P[i]; const prev = P[(i + n - 1) % n];
       if (bb.kind === 'cut') { open = false; continue; }
-      const [p1, p2] = C[i]; const q1 = C[(i + 1) % n][0];
-      if (!open || prev.kind === 'cut') { rim.moveTo(p2.x, p2.y); open = true; } else { rim.lineTo(p1.x, p1.y); rim.quadraticCurveTo(bb.x, bb.y, p2.x, p2.y); }
+      const [p1, p2] = C[i]; const q1 = U((i + 1) % n) || C[(i + 1) % n][0]; const start = U(i) || p2;
+      if (!open || prev.kind === 'cut') { rim.moveTo(start.x, start.y); open = true; } else { rim.lineTo(p1.x, p1.y); rim.quadraticCurveTo(bb.x, bb.y, p2.x, p2.y); }
       rim.lineTo(q1.x, q1.y);
     }
   }
@@ -99,7 +101,7 @@ class Renderer {
     this.rock = document.createElement('canvas'); this.rctx = this.rock.getContext('2d');
     this.scratch = document.createElement('canvas'); this.scratch.width = 256; this.scratch.height = 256; this.sctx = this.scratch.getContext('2d');
     this.curArea = null; this.prevArea = null; this.areaFade = 1;
-    this.textures = {}; this.rebuild();
+    this.textures = {}; this.rockGen = 0; this.rockKey = ''; this.rebuild();
   }
   setSize(W, H, zoom) { this.W = W; this.H = H; this.zoom = zoom; this.LS = 0.5; this.dark.width = Math.ceil(W * this.LS); this.dark.height = Math.ceil(H * this.LS); this.glow.width = this.dark.width; this.glow.height = this.dark.height; this.bgc.width = this.dark.width; this.bgc.height = this.dark.height; this.rock.width = W; this.rock.height = H; }
   rebuild() {
@@ -117,10 +119,10 @@ class Renderer {
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) { if (cx * CHUNK_T >= this.world.w || cy * CHUNK_T >= this.world.h) continue; for (const L of this.chunkLoops(cx, cy)) if (L.maxX > cam.x && L.minX < cam.x + viewW && L.maxY > cam.y && L.minY < cam.y + viewH) out.push(L); }
     return out;
   }
-  invalidateTiles(list) { const keys = new Set(); for (const [x, y] of list) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) keys.add(Math.floor((x + dx) / CHUNK_T) + ',' + Math.floor((y + dy) / CHUNK_T)); for (const k of keys) this.chunks.delete(k); }
+  invalidateTiles(list) { this.rockGen = (this.rockGen || 0) + 1; const keys = new Set(); for (const [x, y] of list) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) keys.add(Math.floor((x + dx) / CHUNK_T) + ',' + Math.floor((y + dy) / CHUNK_T)); for (const k of keys) this.chunks.delete(k); }
   texture(area) {
     if (this.textures[area]) return this.textures[area];
-    const pal = PALETTES[area]; const c = document.createElement('canvas'); c.width = 512; c.height = 512; const x = c.getContext('2d'); const rng = makeRng(area.length * 131 + 7);
+    const pal = PALETTES[area]; const c = document.createElement('canvas'); c.width = 512; c.height = 512; const x = c.getContext('2d'); let seed = 7; for (let i = 0; i < area.length; i++) seed = (seed * 131 + area.charCodeAt(i)) >>> 0; const rng = makeRng(seed);
     for (let i = 0; i < 900; i++) { const px = rng() * 512, py = rng() * 512, r = 3 + rng() * 30; const g = x.createRadialGradient(px, py, 0, px, py, r); const light = rng() < 0.45; g.addColorStop(0, rgba(light ? pal.edgeGlow : pal.rockDeep, light ? 0.4 : 0.55)); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; for (const ox of [-512, 0, 512]) for (const oy of [-512, 0, 512]) { x.beginPath(); x.arc(px + ox, py + oy, r, 0, TAU); x.fill(); } }
     x.strokeStyle = rgba(pal.rockDeep, 0.35); x.lineWidth = 2;
     for (let i = 0; i < 40; i++) { const px = rng() * 512, py = rng() * 512; x.beginPath(); x.moveTo(px, py); let cx = px, cy = py; for (let k = 0; k < 5; k++) { cx += (rng() - 0.5) * 40; cy += (rng() - 0.3) * 30; x.lineTo(cx, cy); } x.stroke(); }
@@ -130,6 +132,9 @@ class Renderer {
   // ---------- terrain
   drawTerrain(ctx, cam, viewW, viewH, t) {
     const rc = this.rctx, z = this.zoom, w = this.world; const W = this.W, H = this.H;
+    const key = `${cam.x.toFixed(2)},${cam.y.toFixed(2)},${viewW},${viewH},${z},${W},${H},${this.rockGen}`;
+    if (key === this.rockKey) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.rock, 0, 0); ctx.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z); this.drawCrystals(ctx, cam, viewW, viewH); this.drawTiles(ctx, cam, viewW, viewH, t); return; }
+    this.rockKey = key;
     rc.setTransform(1, 0, 0, 1, 0, 0); rc.globalCompositeOperation = 'source-over'; rc.clearRect(0, 0, W, H);
     const tf = () => rc.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z);
     // 1. fill rock per area (so each region carries its own palette)
@@ -168,6 +173,10 @@ class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.rock, 0, 0);
     // 4. crystal masses and per-tile details in world space
     ctx.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z);
+    this.drawCrystals(ctx, cam, viewW, viewH);
+    this.drawTiles(ctx, cam, viewW, viewH, t);
+  }
+  drawCrystals(ctx, cam, viewW, viewH) {
     for (const L of this.crystalLoops) {
       if (!(L.maxX > cam.x && L.minX < cam.x + viewW && L.maxY > cam.y && L.minY < cam.y + viewH)) continue;
       const g = ctx.createLinearGradient(L.minX, L.minY, L.maxX, L.maxY); g.addColorStop(0, 'rgba(190,235,255,0.92)'); g.addColorStop(0.5, 'rgba(90,160,220,0.9)'); g.addColorStop(1, 'rgba(160,210,255,0.92)');
@@ -176,7 +185,6 @@ class Renderer {
       for (let x = L.minX - 40; x < L.maxX + 40; x += 14) { ctx.moveTo(x, L.minY); ctx.lineTo(x + 30, L.maxY); } ctx.stroke();
       const sh = ctx.createLinearGradient(0, L.minY, 0, L.maxY); sh.addColorStop(0, 'rgba(255,255,255,0.25)'); sh.addColorStop(1, 'rgba(10,30,80,0.35)'); ctx.fillStyle = sh; ctx.fillRect(L.minX, L.minY, L.maxX - L.minX, L.maxY - L.minY); ctx.restore();
     }
-    this.drawTiles(ctx, cam, viewW, viewH, t);
   }
   drawTiles(ctx, cam, viewW, viewH, t) {
     const w = this.world; const x0 = Math.max(0, Math.floor(cam.x / TILE) - 1), y0 = Math.max(0, Math.floor(cam.y / TILE) - 2), x1 = Math.min(w.w - 1, Math.ceil((cam.x + viewW) / TILE) + 1), y1 = Math.min(w.h - 1, Math.ceil((cam.y + viewH) / TILE) + 2);
@@ -192,7 +200,7 @@ class Renderer {
         let dir = 'up'; if (S(tx, ty - 1) && !S(tx, ty + 1)) dir = 'down'; else if (S(tx - 1, ty) && !S(tx, ty + 1) && !S(tx, ty - 1)) dir = 'right'; else if (S(tx + 1, ty) && !S(tx, ty + 1) && !S(tx, ty - 1)) dir = 'left';
         ctx.save(); ctx.translate(px + 8, py + 8); ctx.rotate(dir === 'down' ? Math.PI : dir === 'right' ? Math.PI / 2 : dir === 'left' ? -Math.PI / 2 : 0);
         ctx.fillStyle = '#4c5060'; ctx.beginPath(); ctx.roundRect(-8, 5, 16, 3, 1); ctx.fill();
-        for (let i = 0; i < 3; i++) { const bx = -8 + i * 5.5 + 2.7; const hh = 10 + hash3(tx, ty, i) * 3; const g = ctx.createLinearGradient(bx - 2.5, 0, bx + 2.5, 0); g.addColorStop(0, '#e8ecf6'); g.addColorStop(0.5, '#c8cedd'); g.addColorStop(1, '#6f7488'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(bx - 2.6, 6); ctx.quadraticCurveTo(bx - 0.5, -hh * 0.4, bx, 6 - hh); ctx.quadraticCurveTo(bx + 0.5, -hh * 0.4, bx + 2.6, 6); ctx.closePath(); ctx.fill(); }
+        for (let i = 0; i < 3; i++) { const bx = -8 + i * 5.5 + 2.7; const hh = 10 + hash3(tx, ty, i) * 3; ctx.fillStyle = '#d8dce8'; ctx.beginPath(); ctx.moveTo(bx - 2.6, 6); ctx.quadraticCurveTo(bx - 0.5, -hh * 0.4, bx, 6 - hh); ctx.quadraticCurveTo(bx + 0.5, -hh * 0.4, bx + 2.6, 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#6f7488'; ctx.beginPath(); ctx.moveTo(bx, 6 - hh); ctx.quadraticCurveTo(bx + 0.5, -hh * 0.4, bx + 2.6, 6); ctx.lineTo(bx + 0.4, 6); ctx.closePath(); ctx.fill(); }
         ctx.restore();
       } else if (ch === '~') {
         const top = w.tile(tx, ty - 1) !== '~';

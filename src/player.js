@@ -68,7 +68,7 @@ function moveY(p, dy, world) {
     }
     p.y = ny; moved += step;
   }
-  if (hit > 0) p.y = Math.round(p.y); // land on integer pixel
+  if (hit > 0) p.y = Math.round((p.y + p.h) / TILE) * TILE - p.h; // snap the feet to the tile grid (never 1px above it)
   return hit;
 }
 
@@ -85,7 +85,7 @@ function updatePlayer(p, inp, world, dt) {
   if (p.hazardTimer > 0) { p.hazardTimer -= dt; if (p.hazardTimer <= 0) { p.x = p.lastSafe.x; p.y = p.lastSafe.y; p.vx = 0; p.vy = 0; p.invuln = 0.8; ev.push('respawn'); } return; }
   if (p.sitting) {
     p.benchTimer += dt;
-    if (p.benchTimer > 0.4 && (inp.left || inp.right || inp.jumpPressed || inp.dashPressed || inp.attackPressed)) { p.sitting = false; ev.push('stand'); }
+    if (p.benchTimer > 0.4 && (inp.left || inp.right || inp.jumpPressed || inp.dashPressed || inp.attackPressed)) { p.sitting = false; p.attackBuffer = 0; p.dashBuffer = 0; p.jumpBuffer = 0; ev.push('stand'); }
     p.vx = 0; return;
   }
   const dir = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);

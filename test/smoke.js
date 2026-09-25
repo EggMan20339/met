@@ -21,7 +21,7 @@ const server = http.createServer((req, res) => {
   await page.screenshot({ path: path.join(outDir, '01b-intro.png') });
   await page.keyboard.press('Escape'); await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(outDir, '02-start.png') });
-  const state = async () => page.evaluate(() => { const g = window.game, p = g.player; return { state: g.state, x: +p.x.toFixed(1), y: +p.y.toFixed(1), hp: p.hp, onGround: p.onGround, area: g.area, fps: g.fpsEstimate, particles: g.fx.ps.length }; });
+  const state = async () => page.evaluate(() => { const g = window.game, p = g.player; return { state: g.state, x: +p.x.toFixed(1), y: +p.y.toFixed(1), hp: p.hp, onGround: p.onGround, area: g.area, particles: g.fx.ps.length }; });
   const s0 = await state();
   await hold('ArrowRight', 900); const s1 = await state();
   await page.keyboard.down('ArrowRight'); await page.keyboard.press('Space'); await page.waitForTimeout(250); const sJump = await state(); await page.waitForTimeout(600); await page.keyboard.up('ArrowRight');
