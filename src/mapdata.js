@@ -1,24 +1,34 @@
 // ---- World data: rooms are ASCII overlays stitched onto a solid-rock world ----
-// Legend: # rock  . air  ^ spikes  ~ void water  = one-way ledge  D dash-breakable wall  I smooth crystal (no wall-cling)
-//         B bench  H life shard  1 dash  2 wall jump  3 double jump  * heart of the spire
-//         e beetle  f moth  s spore bulb  c husk ram  g ash shade  X boss spawn  G boss gate
-//         P player start  L lore stone  N elder pell  T torch  + light crystal
+// Legend: # rock  . air  ^ thorns/spikes  ~ dark water (deadly)  = one-way ledge  D cracked wall (Windstep breaks it)
+//         I smooth glass (cannot be gripped)  % puffcap (bounces you high)
+//         B hearth (rest & save)  H glowbloom petal (+1 max)  S heartwood (splinter upgrade)  * the Great Lantern's heart
+//         1 Windstep  2 Rootgrip  3 Skyleaf  4 Cinder (spell)
+//         e dimling  f hushmoth  s sporeling  c rootram  g snuffer  a emberback  r gloamwing  j springfoot  k lampwright husk
+//         Y Gulletroot  Z the Drowned Bell  X the Lightless  G boss gate
+//         P start  L waystone  N Wick  W Old Bramble  Q Tallow  K the Bell Ringer  T lamp  + chime crystal  h house facade
 const R = (n, c = '#') => c.repeat(n);
 const MAP = {
-  width: 224, height: 128,
+  width: 288, height: 144,
   areas: [
-    { id: 'hollow', name: 'The Hollow', sub: 'where the light went quiet', rects: [[40, 52, 108, 32]] },
-    { id: 'mossgrove', name: 'Mossgrove', sub: 'old roots, older hunger', rects: [[148, 52, 76, 44]] },
-    { id: 'depths', name: 'Sunken Depths', sub: 'the water keeps what it takes', rects: [[0, 84, 224, 44]] },
-    { id: 'heights', name: 'Crystal Heights', sub: 'nothing here can be held', rects: [[0, 0, 176, 52]] },
-    { id: 'spire', name: 'Ashen Spire', sub: 'the warden stirs', rects: [[176, 0, 48, 52]] },
+    { id: 'rootshade', name: 'Rootshade', sub: 'beneath the sleeping tree', rects: [[40, 52, 108, 32]] },
+    { id: 'fernwake', name: 'Fernwake', sub: 'where the ferns still whisper', rects: [[148, 52, 124, 44]] },
+    { id: 'drownwell', name: 'The Drownwell', sub: 'the bell still rings below', rects: [[0, 84, 148, 60]] },
+    { id: 'chimeglass', name: 'Chimeglass Reach', sub: 'every step rings', rects: [[0, 0, 176, 52]] },
+    { id: 'bramblehush', name: 'Bramblehush', sub: 'the quiet grows thorns', rects: [[0, 30, 40, 54]] },
+    { id: 'puffcap', name: 'Puffcap Warrens', sub: 'soft ground, hungry spores', rects: [[148, 96, 140, 48]] },
+    { id: 'lanternry', name: 'The Lanternry', sub: 'the lamplighters are gone', rects: [[176, 0, 64, 52]] },
+    { id: 'cinderthroat', name: 'Cinderthroat', sub: 'where the light was hoarded', rects: [[240, 0, 48, 52]] },
   ],
-  cameraLocks: [[176, 0, 48, 17]],
-  bossArena: { rect: [179, 4, 38, 12], trigger: [179, 4, 34, 12] },
+  cameraLocks: [[240, 0, 48, 17], [224, 70, 48, 26], [0, 116, 70, 28]],
+  bossArenas: [
+    { id: 'gulletroot', spawn: 'Y', rect: [229, 74, 38, 17], trigger: [232, 74, 27, 17], name: 'GULLETROOT', sub: 'the hunger beneath the ferns', reward: '1' },
+    { id: 'bell', spawn: 'Z', rect: [2, 119, 56, 21], trigger: [2, 122, 56, 18], name: 'THE DROWNED BELL', sub: 'it rings for no one now', reward: '2' },
+    { id: 'lightless', spawn: 'X', rect: [243, 4, 38, 12], trigger: [243, 4, 34, 12], name: 'THE LIGHTLESS', sub: 'what Sorrel became', reward: '*' },
+  ],
   rooms: [
-    // ---------------------------------------------------------------- THE HOLLOW (hub)
-    { name: 'Hollow Heart', x: 84, y: 52, lore: [
-      'Press X to slash. Strike upward with Up + X. In the air, Down + X bounces you off foes and thorns alike.',
+    // ---------------------------------------------------------------- ROOTSHADE (hub)
+    { name: 'Rootshade Heart', x: 84, y: 52, lore: [
+      'Press X to strike with your splinter. Up + X strikes above you. In the air, Down + X bounces you off foes and thorns alike.',
     ], rows: [
       R(30) + '....' + R(30),
       R(30) + '....' + R(30),
@@ -31,11 +41,11 @@ const MAP = {
       R(30) + '....' + R(30),
       R(30) + '....' + R(30),
       R(24) + R(14, '.') + R(26),
-      R(20) + R(22, '.') + R(22),
-      R(17) + R(15, '.') + '####' + R(9, '.') + R(19),
-      R(15) + R(32, '.') + R(17),
-      R(13) + R(36, '.') + R(15),
-      R(12) + R(14, '.') + '####' + R(20, '.') + R(14),
+      R(42, '.') + R(22),
+      R(32, '.') + '####' + R(9, '.') + R(19),
+      R(47, '.') + R(17),
+      R(20) + R(29, '.') + R(15),
+      R(12) + R(8, '.') + '####' + '..' + '####' + R(20, '.') + R(14),
       R(11) + R(29, '.') + 'f' + R(10, '.') + R(13),
       R(10) + R(41, '.') + R(13),
       R(9) + R(23, '.') + '####' + R(17, '.') + R(11),
@@ -71,9 +81,68 @@ const MAP = {
       '##....' + R(38),
       '##....' + R(38),
     ] },
-    // ---------------------------------------------------------------- MOSSGROVE
-    { name: 'Moss Path', x: 148, y: 60, lore: [
-      'Mossgrove hums with old life. Bulbs spit, beetles bite; a slash from above or a bounce from below will see you through.',
+    { name: 'Ember Cradle', x: 56, y: 54, lore: [
+      'A cinder thrown is a cinder spent. Tap the rekindle key to hurl one; hold it, and the warmth stays with you.',
+    ], rows: [
+      R(28), R(28),
+      '#' + R(26, '.') + '#',
+      '.' + R(26, '.') + '#',
+      '.' + R(11, '.') + 'f' + R(14, '.') + '#',
+      '.' + R(26, '.') + '#',
+      '#' + '####' + R(22, '.') + '#',
+      '#' + R(10, '.') + 'f' + R(15, '.') + '#',
+      '#' + '.....4' + R(20, '.') + '#',
+      '#' + '...' + '#####' + R(18, '.') + '.',
+      '#' + '...' + '#####' + R(11, '.') + 'L' + R(6, '.') + '.',
+      '#' + '...' + '#####' + R(6, '.') + 'T' + R(11, '.') + '.',
+      R(28), R(28),
+    ] },
+    // ---------------------------------------------------------------- BRAMBLEHUSH
+    { name: 'Bramble Thicket', x: 0, y: 30, lore: [
+      'Old Bramble keeps the last warm hut in the thicket. Bring heartwood and the splinter can be carved keener.',
+    ], rows: [
+      R(40), R(40), R(40), R(40), R(40), R(40), R(40), R(40),
+      '##' + R(37, '.') + '#',
+      '##' + R(35, '.') + 'H' + '.' + '#',
+      '##' + R(21, '.') + '..' + R(11, '^') + '...' + '#',
+      '##' + '..S...k..' + R(12, '.') + R(16) + '#',
+      '##' + R(9) + R(6, '.') + R(5) + '.' + R(16) + '#',
+      '##' + R(9) + R(12, '.') + R(16) + '#',
+      '##' + R(9) + R(12, '.') + R(16) + '#',
+      R(9) + '...' + R(5) + R(22, '.') + '#',
+      R(9) + '^' + R(29, '.') + '#',
+      R(9) + '^' + R(29, '.') + '#',
+      R(9) + R(8, '.') + R(5) + R(17, '.') + '#',
+      R(9) + R(30, '.') + '#',
+      R(9) + R(16, '.') + 'j' + R(12, '.') + '^' + '#',
+      R(9) + R(14, '.') + R(5) + R(10, '.') + '^' + '#',
+      R(9) + R(21, '.') + 'f' + R(8, '.') + '#',
+      R(9) + R(30, '.') + '#',
+      R(9) + R(8, '.') + R(5) + R(17, '.') + '#',
+      R(9) + '^' + R(29, '.') + '#',
+      R(9) + '^' + R(4, '.') + 'f' + R(24, '.') + '#',
+      R(9) + R(14, '.') + R(5) + R(11, '.') + '.',
+      R(9) + R(30, '.') + '.',
+      R(9) + R(30, '.') + '.',
+      R(9) + R(20, '.') + R(10) + '#',
+      '#' + R(38, '.') + '#',
+      '#' + R(27, '.') + R(5) + R(6, '.') + '#',
+      '#' + R(38, '.') + '#',
+      '#' + R(38, '.') + '#',
+      '#' + R(33, '.') + R(5) + '#',
+      '#' + R(38, '.') + '#',
+      '#' + R(38, '.') + '#',
+      '#' + R(27, '.') + R(5) + R(6, '.') + '#',
+      '#' + R(38, '.') + '#',
+      '#' + R(38, '.') + '#',
+      '#' + R(33, '.') + R(5) + '#',
+      '#' + R(38, '.') + '#',
+      '#...BT..W....L......c.......a..........#',
+      R(40), R(40), R(40), R(40), R(40), R(40),
+    ] },
+    // ---------------------------------------------------------------- FERNWAKE
+    { name: 'Fern Path', x: 148, y: 60, lore: [
+      'Fernwake hums with old life. Sporelings spit and dimlings bite; a strike from above or a bounce from below will see you through.',
     ], rows: [
       R(44), R(44), R(44), R(44), R(44), R(44), R(44), R(44),
       R(17) + R(8, '.') + R(19),
@@ -91,8 +160,8 @@ const MAP = {
       R(30) + '^^^^' + R(10),
       R(44), R(44), R(44),
     ] },
-    { name: 'Moss Vale', x: 192, y: 56, lore: [
-      'The shrine of wind lies here. Cracked walls elsewhere will not stand against its gift.',
+    { name: 'Fern Vale', x: 192, y: 56, lore: [
+      'Something hungers past the eastern roots. The lamplighters sealed their gift of wind behind it.',
     ], rows: [
       R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32), R(32),
       '#' + R(30, '.') + '#',
@@ -110,14 +179,36 @@ const MAP = {
       '#............####..........D.H.#',
       '#' + R(26, '.') + '#####',
       R(13) + R(18, '.') + '#',
-      '#' + R(18, '.') + '####' + '....' + '1' + '...' + '#',
-      '#H.....................L..###..#',
-      '#.^^^^^^^^^^....e....T....###.T#',
+      '#' + R(18, '.') + '####' + R(8, '.') + '#',
+      '#H' + R(21, '.') + 'L' + R(8, '.'),
+      '#.^^^^^^^^^^....e....T' + R(10, '.'),
       R(32), R(32), R(32), R(32), R(32),
     ] },
-    // ---------------------------------------------------------------- SUNKEN DEPTHS
-    { name: 'Depths Well', x: 20, y: 84, lore: [
-      'You have fallen far. The way back up needs walls that remember you. Seek the sanctum to the west, past the pools.',
+    { name: 'Fernwake Maw', x: 224, y: 70, rows: [
+      R(48), R(48), R(48), R(48),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(38, '.') + R(5),
+      R(5) + R(35, '.') + '.1.' + R(4, '.') + '#',
+      R(4, '.') + 'G' + R(35, '.') + '###' + R(4, '.') + '#',
+      R(4, '.') + 'G' + R(35, '.') + '###' + R(4, '.') + '#',
+      '..T.' + 'G' + '.T' + R(19, '.') + 'Y' + R(13, '.') + '###' + '.T..' + '#',
+      R(44) + '===' + '#',
+      R(48), R(48), R(48), R(48),
+    ] },
+    // ---------------------------------------------------------------- THE DROWNWELL
+    { name: 'Drownwell Shaft', x: 20, y: 84, lore: [
+      'You have fallen far. The way back up needs walls that remember you. West, past the pools, the bell still sleeps.',
     ], rows: [
       R(22) + '....' + R(30),
       R(22) + '....' + R(30),
@@ -150,8 +241,8 @@ const MAP = {
       R(22) + '~~~~' + R(8) + '~~~~' + R(18),
       R(56), R(56), R(56),
     ] },
-    { name: 'Depths Sanctum', x: 2, y: 96, lore: [
-      'Here the old ones learned to cling. Rest, and the stone will hold you.',
+    { name: 'Bell Antechamber', x: 2, y: 96, lore: [
+      'The Bell Ringer waits here still, though the bell no longer answers. Below, the drowned keep what they took.',
     ], rows: [
       R(18), R(18), R(18), R(18), R(18), R(18),
       '#######....#######',
@@ -159,26 +250,128 @@ const MAP = {
       '####..........####',
       '###............###',
       '###............###',
-      '###......2.....###',
-      '##T.....###....T..',
-      '##......###.......',
-      '##......###.L.....',
-      R(18), R(18), R(18), R(18), R(18),
+      '###.....K......###',
+      '##T............T..',
+      '##................',
+      '##..........L.....',
+      '####......########',
+      '####......########',
+      '####......########',
+      '####......########',
+      '####......########',
     ] },
-    { name: 'Depths Flooded', x: 76, y: 100, rows: [
+    { name: 'Bell Chamber', x: 0, y: 116, rows: [
+      R(6) + R(6, '.') + R(48) + R(4, '.') + R(6),
+      R(6) + R(6, '.') + R(48) + R(4, '.') + R(6),
+      R(6) + R(6, '.') + R(48) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(56, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(41, '.') + '2' + R(14, '.') + R(2) + R(4, '.') + R(6),
+      '##' + R(40, '.') + '###' + R(19, '.') + R(6),
+      '##' + R(40, '.') + '###' + R(19, '.') + R(6),
+      '##' + '.T' + R(20, '.') + 'Z' + R(17, '.') + '###' + '.T' + R(17, '.') + R(6),
+      R(70), R(70), R(70), R(70), R(70),
+    ] },
+    { name: 'Drownwell Halls', x: 76, y: 100, rows: [
       R(75), R(75), R(75), R(75), R(75),
       '#' + R(73, '.') + '#',
       '#' + R(73, '.') + '#',
       '#' + R(41, '.') + 'f' + R(31, '.') + '#',
-      R(37, '.') + 's' + R(34, '.') + 'H' + '.' + '#',
-      R(36, '.') + '#####' + R(25, '.') + R(9),
-      '....e' + R(31, '.') + '#####' + R(16, '.') + 'e' + '..' + '^^^^' + '..' + R(9),
+      R(37, '.') + 's' + R(34, '.') + 'H' + '.' + '.',
+      R(36, '.') + '#####' + R(25, '.') + R(8) + '.',
+      '....e' + R(31, '.') + '#####' + R(16, '.') + 'e' + '..' + '^^^^' + '..' + R(8) + '.',
       R(21) + '~~~~' + '##' + '~~~~' + R(15) + '~~~~' + '##' + '~~~~' + R(19),
       R(21) + '~~~~' + '##' + '~~~~' + R(15) + '~~~~' + '##' + '~~~~' + R(19),
       R(75), R(75), R(75), R(75), R(75), R(75), R(75),
     ] },
-    // ---------------------------------------------------------------- CRYSTAL HEIGHTS
-    { name: 'Heights Shaft', x: 100, y: 20, rows: [
+    // ---------------------------------------------------------------- PUFFCAP WARRENS
+    { name: 'Puffcap Entry', x: 151, y: 96, lore: [
+      'The puffcaps here grew fat on stolen light. Land on one and it will throw you high; mind where you come down.',
+    ], rows: [
+      R(49), R(49), R(49),
+      R(20) + R(28, '.') + '.',
+      R(20) + R(28, '.') + '.',
+      R(20) + '....L' + R(23, '.') + '.',
+      R(20) + '....' + R(25),
+      R(20) + '....' + R(25),
+      R(20) + '....' + R(25),
+      R(20) + '....' + R(25),
+      R(20) + '....' + R(25),
+      R(20) + '....' + R(25),
+      R(19, '.') + '#' + '....' + R(25),
+      R(19, '.') + '#' + '....' + R(25),
+      R(6, '.') + 'f' + R(12, '.') + '#' + '....' + R(25),
+      '##' + R(17, '.') + '#' + '....' + R(25),
+      '##' + R(17, '.') + '#' + '....' + R(25),
+      '##' + R(17, '.') + '#' + '....' + R(25),
+      '###' + '####' + R(12, '.') + '#' + '....' + R(25),
+      '##' + R(17, '.') + '#' + '....' + R(25),
+      '##' + R(17, '.') + '#' + '....' + '#' + R(23, '.') + '#',
+      '##' + R(7, '.') + '####' + R(6, '.') + '#' + '....' + '#' + R(23, '.') + '#',
+      '##' + R(46, '.') + '#',
+      '##' + R(30, '.') + 'j' + R(15, '.') + '#',
+      '###' + '####' + R(13, '.') + '####' + R(24, '.') + '#',
+      '##' + R(46, '.') + '#',
+      '##' + '....a' + R(10, '.') + 'e' + R(30, '.') + '#',
+      R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49), R(49),
+    ] },
+    { name: 'Puffcap Deep', x: 200, y: 96, rows: [
+      R(68) + '...' + R(17),
+      R(68) + '...' + R(17),
+      R(68) + '...' + R(17),
+      R(31, '.') + R(37) + '...' + R(17),
+      R(31, '.') + R(35) + R(8, '.') + R(14),
+      R(31, '.') + R(12) + R(5, '.') + R(18) + R(8, '.') + R(14),
+      R(4) + R(4, '.') + R(23) + R(17, '.') + R(18) + R(8, '.') + R(14),
+      R(4) + R(4, '.') + R(2) + R(38, '.') + R(3) + R(15, '.') + R(8) + R(14),
+      R(4) + R(4, '.') + R(2) + R(38, '.') + R(3) + R(15, '.') + R(22),
+      R(4) + R(4, '.') + R(2) + R(33, '.') + R(5) + R(3) + R(15, '.') + R(22),
+      R(4) + R(4, '.') + R(2) + R(38, '.') + R(3) + R(15, '.') + R(22),
+      R(4) + R(4, '.') + R(2) + R(38, '.') + R(3) + R(15, '.') + R(22),
+      R(4) + R(4, '.') + R(2) + R(26, '.') + 'r' + R(11, '.') + R(3) + R(15, '.') + R(22),
+      R(4) + R(4, '.') + R(2) + R(30, '.') + '%%' + R(6, '.') + R(3) + R(15, '.') + R(22),
+      R(4) + R(32, '.') + R(15) + R(12, '.') + '%%' + '.' + R(22),
+      R(4) + R(32, '.') + R(15) + R(11, '.') + R(8) + R(18, '.'),
+      R(4) + R(32, '.') + R(15) + R(37, '.'),
+      R(4) + R(32, '.') + R(15) + R(37, '.'),
+      R(4) + R(32, '.') + R(15) + R(37, '.'),
+      R(4) + R(14, '.') + 'j' + R(17, '.') + R(15) + R(37, '.'),
+      R(4) + R(32, '.') + R(15) + R(37, '.'),
+      R(4) + R(32, '.') + R(15) + R(37, '.'),
+      R(4) + R(14, '.') + R(15) + R(3, '.') + R(15) + R(9, '.') + '%%' + R(26, '.'),
+      R(4) + R(32, '.') + R(15) + R(8, '.') + R(8) + R(21, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(20, '.') + 's' + R(63, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(60, '.') + 'r' + R(23, '.'),
+      R(4) + R(53, '.') + '%%' + R(29, '.'),
+      R(4) + R(52, '.') + R(8) + R(24, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(40, '.') + 'j' + R(43, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(84, '.'),
+      R(4) + R(5, '.') + 'BT' + R(13, '.') + 'e' + R(20, '.') + 'j' + R(8, '.') + '%%' + R(6, '.') + 'e' + R(11, '.') + 'c' + R(3, '.') + 'S' + R(3, '.') + 'T' + R(5, '.'),
+      R(88), R(88), R(88), R(88), R(88),
+    ] },
+    // ---------------------------------------------------------------- CHIMEGLASS REACH
+    { name: 'Chime Shaft', x: 100, y: 20, rows: [
       R(32), R(32), R(32), R(32),
       R(13) + R(6, '.') + R(13),
       R(10) + R(12, '.') + R(10),
@@ -209,8 +402,8 @@ const MAP = {
       R(14) + '....' + R(14),
       R(14) + '....' + R(14),
     ] },
-    { name: 'Heights Gallery', x: 20, y: 14, lore: [
-      'Crystal cannot be climbed; it is too smooth for any grip. Whoever seeks the far bridge will need wings.',
+    { name: 'Chime Gallery', x: 20, y: 14, lore: [
+      'Chimeglass cannot be gripped; it is too smooth for any hold. Whoever seeks the far bridge will need a second leap.',
     ], rows: [
       R(80), R(80), R(80),
       R(34) + R(8, '.') + R(38),
@@ -237,8 +430,8 @@ const MAP = {
       R(46) + R(9, '^') + R(25),
       R(80), R(80),
     ] },
-    { name: 'Heights Bridge', x: 132, y: 8, lore: [
-      'Beyond lies the Ashen Spire, where the Warden sleeps. Rest if you find the bench; the fire ahead does not forgive.',
+    { name: 'Chime Bridge', x: 132, y: 8, lore: [
+      'Beyond lies the Lanternry, and past it the Cinderthroat where Sorrel hoarded the light. Rest at the hearth if you find it.',
     ], rows: [
       R(44), R(44), R(44), R(44), R(44), R(44), R(44), R(44), R(44), R(44), R(44), R(44),
       '#' + R(42, '.') + '#',
@@ -258,9 +451,28 @@ const MAP = {
       '....T...........' + R(28),
       R(44), R(44), R(44), R(44), R(44),
     ] },
-    // ---------------------------------------------------------------- ASHEN SPIRE
-    { name: 'Spire Ascent', x: 176, y: 0, lore: [
-      'Ash falls. The Warden stirs above: it charges when its eyes burn red, and leaps when it crouches. Strike it, and bounce from its back.',
+    // ---------------------------------------------------------------- THE LANTERNRY
+    { name: 'Lantern Row', x: 176, y: 0, lore: [
+      'Here the lamplighters lived, and here they went dark, one lamp at a time. Tallow alone still keeps his lit.',
+    ], rows: [
+      R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64),
+      '#' + R(62, '.') + '#',
+      '#' + R(62, '.') + '#',
+      '#' + R(62, '.') + '#',
+      '#' + R(62, '.') + '#',
+      '#' + R(62, '.') + '#',
+      '#' + R(11, '.') + 'H' + R(50, '.') + '#',
+      '#' + R(7, '.') + R(9, '=') + R(29, '.') + R(9, '=') + R(8, '.') + '#',
+      '#' + R(29, '.') + R(9, '=') + R(24, '.') + '#',
+      R(64, '.'),
+      R(64, '.'),
+      R(64, '.'),
+      '....T...h...........B..Q...T..h.........k..T..h..........T..L...',
+      R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64), R(64),
+    ] },
+    // ---------------------------------------------------------------- CINDERTHROAT
+    { name: 'Cinder Ascent', x: 240, y: 0, lore: [
+      'Ash falls. The Lightless stirs above: it charges when its eyes burn red, and leaps when it crouches. Strike it, and bounce from its back.',
     ], rows: [
       R(48), R(48), R(48), R(48),
       '###' + R(38, '.') + R(7),
@@ -290,6 +502,11 @@ const MAP = {
       R(48), R(48), R(48), R(48), R(48), R(48), R(48), R(48),
     ] },
   ],
-  rects: [],
+  rects: [
+    [40, 54, 16, 6, '.'],   // Bramblehush passage from the Ember Cradle (tall enough for a full jump)
+    [44, 60, 9, 3, '~'],    // ...with a nine-tile drop only Windstep can cross
+    [60, 111, 4, 5, '.'],   // shaft from the Drownwell floor down into the Bell Chamber
+    [268, 92, 3, 4, '.'],   // shaft from Fernwake Maw's ledge down into Puffcap Deep
+  ],
 };
 if (typeof module !== 'undefined') module.exports = { MAP };

@@ -113,7 +113,7 @@ console.log(`Abilities: [${abilities.join(', ') || 'none'}]  nodes: ${seen.size}
 function coveredNear(px, py, rx, ry) { for (let y = Math.floor((py - ry) / 4); y <= Math.floor((py + ry) / 4); y++) for (let x = Math.floor((px - rx) / 4); x <= Math.floor((px + rx) / 4); x++) if (x >= 0 && y >= 0 && x < CW && y < CH && cover[y * CW + x]) return true; return false; }
 const report = [];
 for (const e of world.entities) {
-  if (!'H123*BLNX'.includes(e.type)) continue;
+  if (!'H1234S*BLNWQKXYZk'.includes(e.type)) continue;
   const cx = e.tx * TILE + 8, cy = e.ty * TILE + 8;
   const ok = coveredNear(cx, cy, 14, 16);
   report.push(`${ok ? 'REACH ' : 'MISS  '} ${e.type} ${e.room} @${e.tx},${e.ty}`);

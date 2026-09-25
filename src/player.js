@@ -2,9 +2,9 @@
 const PHYS = {
   GRAV: 1500, MAX_FALL: 430, RUN: 165, GROUND_ACC: 2400, GROUND_FRIC: 2800, AIR_ACC: 1500, AIR_DEC: 900,
   JUMP_V: -420, DJUMP_V: -390, WALLJUMP_VX: 230, WALLJUMP_VY: -400, WALL_LOCK: 0.14, WALL_SLIDE: 70,
-  COYOTE: 0.1, JUMP_BUFFER: 0.12, DASH_SPEED: 520, DASH_TIME: 0.14, DASH_CD: 0.35,
-  ATTACK_CD: 0.3, ATTACK_TIME: 0.11, POGO_V: -380, FOCUS_TIME: 0.9, SOUL_MAX: 99, SOUL_HIT: 11, SOUL_HEAL: 33,
-  INVULN: 1.1, HURT_TIME: 0.22, APEX_THRESH: 60,
+  COYOTE: 0.1, JUMP_BUFFER: 0.15, DASH_SPEED: 520, DASH_TIME: 0.14, DASH_CD: 0.35, ACTION_BUFFER: 0.18,
+  ATTACK_CD: 0.28, ATTACK_TIME: 0.11, POGO_V: -380, FOCUS_TIME: 0.9, FOCUS_WARM: 0.45, SOUL_MAX: 100, SOUL_HIT: 12, SOUL_HEAL: 35, SPELL_COST: 30,
+  INVULN: 1.1, HURT_TIME: 0.22, APEX_THRESH: 60, BOUNCE_V: -640, TAP_TIME: 0.2,
 };
 const PW = 10, PH = 15; // hitbox size
 
@@ -13,10 +13,10 @@ function makePlayer(x, y) {
     x, y, w: PW, h: PH, vx: 0, vy: 0, facing: 1,
     onGround: false, wasOnGround: false, wallDir: 0, wallSliding: false, dashing: 0, dashDir: 1, dashCd: 0, canDash: true,
     canDoubleJump: true, coyote: 0, jumpBuffer: 0, lockout: 0, jumpHeld: false, jumpedFromGround: false,
-    attackTimer: 0, attackCd: 0, attackDir: 'right', attackHit: null, recoil: 0,
+    attackTimer: 0, attackCd: 0, attackDir: 'right', attackHit: null, recoil: 0, attackBuffer: 0, dashBuffer: 0,
     hp: 5, maxHp: 5, soul: 0, focusTimer: 0, focusing: false, invuln: 0, hurtTimer: 0, dead: false, deathTimer: 0,
     hazardTimer: 0, lastSafe: { x, y }, sitting: false, benchTimer: 0,
-    abilities: { dash: false, walljump: false, doublejump: false },
+    abilities: { dash: false, walljump: false, doublejump: false, spell: false }, damage: 1, warm: false, focusHeld: 0, castTimer: 0, flareCd: 0,
     anim: { t: 0, squash: 1, stretch: 1, run: 0, land: 0, blink: 0, tail: [] },
     events: [], // transient events for fx/sound: strings
   };
@@ -76,7 +76,10 @@ function updatePlayer(p, inp, world, dt) {
   const ev = p.events; ev.length = 0;
   const A = p.abilities;
   const dec = (k) => { if (p[k] > 0) p[k] = Math.max(0, p[k] - dt); };
-  ['dashCd', 'coyote', 'jumpBuffer', 'lockout', 'attackTimer', 'attackCd', 'invuln', 'hurtTimer', 'recoil', 'dropThrough'].forEach(dec);
+  ['dashCd', 'coyote', 'jumpBuffer', 'lockout', 'attackTimer', 'attackCd', 'invuln', 'hurtTimer', 'recoil', 'dropThrough', 'attackBuffer', 'dashBuffer', 'castTimer', 'flareCd'].forEach(dec);
+  // Buffer attack / dash presses so a press during cooldown, hurt or a dash still fires as soon as it can
+  if (inp.attackPressed) p.attackBuffer = PHYS.ACTION_BUFFER;
+  if (inp.dashPressed) p.dashBuffer = PHYS.ACTION_BUFFER;
   p.anim.t += dt;
   if (p.dead) { p.deathTimer += dt; return; }
   if (p.hazardTimer > 0) { p.hazardTimer -= dt; if (p.hazardTimer <= 0) { p.x = p.lastSafe.x; p.y = p.lastSafe.y; p.vx = 0; p.vy = 0; p.invuln = 0.8; ev.push('respawn'); } return; }
@@ -101,17 +104,21 @@ function updatePlayer(p, inp, world, dt) {
   if (inp.jumpPressed) p.jumpBuffer = PHYS.JUMP_BUFFER;
   if (inp.jump === false) p.jumpHeld = false;
 
-  // Focus (heal): hold while grounded and still
-  const canFocus = inp.focus && p.onGround && dir === 0 && p.soul >= PHYS.SOUL_HEAL && p.hp < p.maxHp && p.attackTimer <= 0 && !p.dashing && p.hurtTimer <= 0;
+  // Rekindle key: a tap throws a Cinder (spell), a hold rekindles a petal (faster near warmth)
+  if (inp.focus) p.focusHeld += dt; 
+  const tapped = !inp.focus && p.focusHeld > 0 && p.focusHeld < PHYS.TAP_TIME;
+  if (!inp.focus) p.focusHeld = 0;
+  if (tapped && A.spell && p.soul >= PHYS.SPELL_COST && !p.dashing && p.hurtTimer <= 0 && p.castTimer <= 0) { p.soul -= PHYS.SPELL_COST; p.castTimer = 0.35; p.attackTimer = 0; ev.push('cast'); }
+  const canFocus = inp.focus && p.focusHeld >= PHYS.TAP_TIME && p.onGround && dir === 0 && p.soul >= PHYS.SOUL_HEAL && p.hp < p.maxHp && p.attackTimer <= 0 && !p.dashing && p.hurtTimer <= 0;
   if (canFocus) {
     if (!p.focusing) ev.push('focusstart');
-    p.focusing = true; p.focusTimer += dt;
+    p.focusing = true; p.focusTimer += dt * (p.warm ? PHYS.FOCUS_TIME / PHYS.FOCUS_WARM : 1);
     if (p.focusTimer >= PHYS.FOCUS_TIME) { p.hp++; p.soul -= PHYS.SOUL_HEAL; p.focusTimer = 0; ev.push('heal'); if (p.hp >= p.maxHp || p.soul < PHYS.SOUL_HEAL) p.focusing = false; }
   } else { if (p.focusing) ev.push('focusend'); p.focusing = false; p.focusTimer = 0; }
 
   // Dash
-  if (inp.dashPressed && A.dash && p.canDash && p.dashCd <= 0 && !p.dashing && p.hurtTimer <= 0) {
-    p.dashing = PHYS.DASH_TIME; p.dashDir = dir || p.facing; p.facing = p.dashDir; p.dashCd = PHYS.DASH_CD;
+  if (p.dashBuffer > 0 && A.dash && p.canDash && p.dashCd <= 0 && !p.dashing && p.hurtTimer <= 0) {
+    p.dashBuffer = 0; p.dashing = PHYS.DASH_TIME; p.dashDir = dir || p.facing; p.facing = p.dashDir; p.dashCd = PHYS.DASH_CD;
     if (!p.onGround) p.canDash = false;
     p.vy = 0; p.focusing = false; p.focusTimer = 0; p.attackTimer = 0; ev.push('dash');
   }
@@ -152,8 +159,8 @@ function updatePlayer(p, inp, world, dt) {
     if (inp.jumpReleased && p.vy < 0 && p.jumpHeld) { p.vy *= 0.45; p.jumpHeld = false; }
   }
   // Attack
-  if (inp.attackPressed && p.attackCd <= 0 && !p.dashing && p.hurtTimer <= 0 && !p.focusing) {
-    p.attackCd = PHYS.ATTACK_CD; p.attackTimer = PHYS.ATTACK_TIME; p.attackHit = new Set();
+  if (p.attackBuffer > 0 && p.attackCd <= 0 && !p.dashing && p.hurtTimer <= 0 && !p.focusing) {
+    p.attackBuffer = 0; p.attackCd = PHYS.ATTACK_CD; p.attackTimer = PHYS.ATTACK_TIME; p.attackHit = new Set();
     p.attackDir = inp.up ? 'up' : (inp.down && !p.onGround ? 'down' : (p.facing > 0 ? 'right' : 'left'));
     ev.push('slash');
   }
@@ -171,8 +178,8 @@ function updatePlayer(p, inp, world, dt) {
   }
   const hitY = moveY(p, p.vy * dt, world);
   if (hitY > 0) {
-    if (!p.onGround) { p.onGround = true; ev.push({ type: 'land', speed: prevVy }); }
-    p.vy = 0;
+    if (world.rectHas(p.x + 2, p.y + p.h, p.w - 4, 2, (tx, ty) => world.isBouncer(tx, ty))) { p.vy = PHYS.BOUNCE_V; p.onGround = false; p.coyote = 0; p.canDoubleJump = true; p.canDash = true; p.jumpHeld = false; ev.push('bounce'); }
+    else { if (!p.onGround) { p.onGround = true; ev.push({ type: 'land', speed: prevVy }); } p.vy = 0; }
   } else if (hitY < 0) { p.vy = 0; p.jumpHeld = false; }
   // Hazards
   if (p.invuln <= 0 && p.hazardTimer <= 0) {
@@ -203,6 +210,9 @@ function attackHitbox(p) {
 }
 function hurtPlayer(p, dmg, srcX, srcY) {
   if (p.invuln > 0 || p.dead || p.dashing > 0 || p.hazardTimer > 0) return false;
+  if (p.soul >= PHYS.SOUL_MAX && p.flareCd <= 0) { // a full lantern flares instead of losing a petal
+    p.soul = 0; p.invuln = PHYS.INVULN; p.flareCd = 2; p.focusing = false; p.focusTimer = 0; p.events.push('flare'); return true;
+  }
   p.hp -= dmg; p.invuln = PHYS.INVULN; p.hurtTimer = PHYS.HURT_TIME; p.focusing = false; p.focusTimer = 0; p.sitting = false;
   const c = pCenter(p); const dx = c.x - srcX; p.vx = (dx === 0 ? -p.facing : sign(dx)) * 190; p.vy = -170;
   if (p.hp <= 0) { p.hp = 0; p.dead = true; p.deathTimer = 0; p.events.push('die'); } else p.events.push('hurt');

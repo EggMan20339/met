@@ -1,13 +1,13 @@
 // ---- World: builds the tile grid from MAP data and answers spatial queries ---
-const SOLID_CHARS = new Set(['#', 'I', 'D']);
-const ENTITY_CHARS = new Set(['P', 'B', 'H', '1', '2', '3', 'e', 'f', 's', 'c', 'X', 'L', 'N', 'T', '+', '*', 'g']);
+const SOLID_CHARS = new Set(['#', 'I', 'D', '%']);
+const ENTITY_CHARS = new Set(['P', 'B', 'H', '1', '2', '3', '4', 'S', '*', 'e', 'f', 's', 'c', 'g', 'a', 'r', 'j', 'k', 'X', 'Y', 'Z', 'L', 'N', 'W', 'Q', 'K', 'T', '+', 'h']);
 
 class World {
   constructor(map) {
     this.map = map; this.w = map.width; this.h = map.height;
     this.tiles = new Uint8Array(this.w * this.h);
     this.entities = []; // {type, tx, ty, room, idx}
-    this.gatesClosed = false;
+    this.closedGates = new Set();
     this.brokenWalls = [];
     this.build();
   }
@@ -33,6 +33,7 @@ class World {
     const loreByRoom = {};
     for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) {
       const ch = grid[y][x];
+      if (ch === 'G') this.entities.push({ type: 'G', tx: x, ty: y, id: `G_${x}_${y}`, room: null }); // gate tiles stay tiles, but are also listed
       if (ENTITY_CHARS.has(ch)) {
         const room = this.roomAt(x, y);
         const ent = { type: ch, tx: x, ty: y, id: `${ch}_${x}_${y}`, room: room ? room.name : null };
@@ -55,8 +56,11 @@ class World {
   }
   set(x, y, ch) { if (x >= 0 && y >= 0 && x < this.w && y < this.h) this.tiles[y * this.w + x] = ch.charCodeAt(0); }
   tile(x, y) { if (x < 0 || y < 0 || x >= this.w || y >= this.h) return '#'; return String.fromCharCode(this.tiles[y * this.w + x]); }
-  isSolid(x, y) { const c = this.tile(x, y); return SOLID_CHARS.has(c) || (c === 'G' && this.gatesClosed); }
-  isClingable(x, y) { const c = this.tile(x, y); return c === '#' || c === 'D' || (c === 'G' && this.gatesClosed); }
+  isSolid(x, y) { const c = this.tile(x, y); return SOLID_CHARS.has(c) || (c === 'G' && this.closedGates.has(x + ',' + y)); }
+  isClingable(x, y) { const c = this.tile(x, y); return c === '#' || c === 'D' || (c === 'G' && this.closedGates.has(x + ',' + y)); }
+  isBouncer(x, y) { return this.tile(x, y) === '%'; }
+  closeGatesNear(rect) { for (const e of this.entities) if (e.type === 'G' && e.tx >= rect[0] - 2 && e.ty >= rect[1] - 2 && e.tx < rect[0] + rect[2] + 2 && e.ty < rect[1] + rect[3] + 2) this.closedGates.add(e.tx + ',' + e.ty); }
+  openGates() { this.closedGates.clear(); }
   isOneWay(x, y) { return this.tile(x, y) === '='; }
   isHazard(x, y) { const c = this.tile(x, y); return c === '^' || c === '~'; }
   isSpike(x, y) { return this.tile(x, y) === '^'; }

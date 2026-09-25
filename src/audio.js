@@ -74,6 +74,17 @@ class AudioSys {
       case 'slam': this.noise({ dur: 0.35, vol: 0.35, hp: 40, lp: 600 }); this.tone({ f: 70, f2: 30, type: 'sine', dur: 0.4, vol: 0.35 }); break;
       case 'gate': this.noise({ dur: 0.5, vol: 0.25, hp: 80, lp: 1200 }); this.tone({ f: 150, f2: 60, type: 'square', dur: 0.5, vol: 0.12 }); break;
       case 'bossdeath': this.tone({ f: 200, f2: 30, type: 'sawtooth', dur: 2.2, vol: 0.3 }); this.noise({ dur: 2.0, vol: 0.3, hp: 40, lp: 900 }); [0, 7, 12, 19, 24].forEach((s, i) => this.tone({ f: 220 * Math.pow(2, s / 12), type: 'sine', dur: 1.5, vol: 0.1, delay: 0.8 + i * 0.12, send: 0.8 })); break;
+      case 'cast': this.tone({ f: 600, f2: 1400, type: 'sine', dur: 0.18, vol: 0.16 }); this.noise({ dur: 0.12, vol: 0.1, hp: 1500 }); break;
+      case 'flare': this.tone({ f: 300, f2: 1200, type: 'triangle', dur: 0.5, vol: 0.22, send: 0.5 }); this.noise({ dur: 0.4, vol: 0.2, hp: 400, lp: 5000 }); [0, 7, 12].forEach((s, i) => this.tone({ f: 520 * Math.pow(2, s / 12), type: 'sine', dur: 0.6, vol: 0.1, delay: 0.05 + i * 0.06, send: 0.5 })); break;
+      case 'bounce': this.tone({ f: 200, f2: 700, type: 'sine', dur: 0.22, vol: 0.2 }); this.tone({ f: 100, f2: 300, type: 'triangle', dur: 0.15, vol: 0.12 }); break;
+      case 'blocked': this.tone({ f: 1400, f2: 900, type: 'square', dur: 0.07, vol: 0.09 }); this.noise({ dur: 0.06, vol: 0.14, hp: 2500 }); break;
+      case 'bell': this.tone({ f: 196, type: 'sine', dur: 2.2, vol: 0.25, send: 0.8 }); this.tone({ f: 196 * 2.76, type: 'sine', dur: 1.4, vol: 0.1, send: 0.8 }); this.tone({ f: 196 * 5.4, type: 'sine', dur: 0.8, vol: 0.05, send: 0.8 }); this.noise({ dur: 0.15, vol: 0.15, hp: 300, lp: 3000 }); break;
+      case 'thorns': this.noise({ dur: 0.25, vol: 0.25, hp: 200, lp: 2500 }); this.tone({ f: 120, f2: 380, type: 'sawtooth', dur: 0.2, vol: 0.12 }); break;
+      case 'lash': this.noise({ dur: 0.3, vol: 0.2, hp: 800, lp: 6000 }); this.tone({ f: 900, f2: 200, type: 'sine', dur: 0.3, vol: 0.1 }); break;
+      case 'rumble': this.noise({ dur: 1.2, vol: 0.25, hp: 30, lp: 300 }); this.tone({ f: 40, f2: 30, type: 'sine', dur: 1.2, vol: 0.3 }); break;
+      case 'hop': this.tone({ f: 260, f2: 520, type: 'triangle', dur: 0.12, vol: 0.09 }); break;
+      case 'swing': this.noise({ dur: 0.14, vol: 0.2, hp: 700, lp: 5000 }); this.tone({ f: 500, f2: 180, type: 'sawtooth', dur: 0.14, vol: 0.08 }); break;
+      case 'upgrade': [0, 5, 7, 12, 16, 19, 24].forEach((s, i) => this.tone({ f: 220 * Math.pow(2, s / 12), type: 'triangle', dur: 0.7, vol: 0.12, delay: i * 0.09, send: 0.7 })); this.noise({ dur: 0.8, vol: 0.08, hp: 3000 }); break;
       case 'ui': this.tone({ f: 880, type: 'sine', dur: 0.06, vol: 0.08 }); break;
       case 'text': this.tone({ f: r(1200, 1500), type: 'sine', dur: 0.02, vol: 0.02 }); break;
       case 'shard': [0, 3, 7, 10, 14].forEach((s, i) => this.tone({ f: 440 * Math.pow(2, s / 12), type: 'sine', dur: 0.5, vol: 0.1, delay: i * 0.09, send: 0.6 })); break;
@@ -89,7 +100,7 @@ class AudioSys {
   }
   musicStep() {
     if (!this.ctx || !this.enabled || !this.area) return;
-    const M = MUSIC_THEMES[this.boss ? 'boss' : this.area] || MUSIC_THEMES.hollow;
+    const M = MUSIC_THEMES[this.boss ? 'boss' : this.area] || MUSIC_THEMES.rootshade;
     const chord = M.chords[this.chordIdx % M.chords.length]; this.chordIdx++;
     const t0 = this.ctx.currentTime; const dur = this.boss ? 1.8 : 3.6;
     // pad voices
@@ -123,10 +134,13 @@ class AudioSys {
   }
 }
 const MUSIC_THEMES = {
-  hollow: { root: 110, chords: [[0, 7, 12, 16], [-2, 5, 10, 14], [-4, 3, 8, 12], [-2, 5, 10, 15]], scale: [0, 2, 4, 7, 9, 11], padVol: 0.05, leadVol: 0.05, filter: 800, bass: 0.06 },
-  mossgrove: { root: 130.81, chords: [[0, 4, 7, 11], [2, 5, 9, 12], [-3, 0, 4, 7], [-5, -1, 2, 7]], scale: [0, 2, 4, 5, 7, 9, 11], padVol: 0.045, leadVol: 0.06, filter: 1200, bass: 0.05, leadType: 'triangle' },
-  depths: { root: 82.41, chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [-2, 1, 5, 8], [0, 3, 7, 14]], scale: [0, 3, 5, 7, 10], padVol: 0.05, leadVol: 0.035, filter: 500, bass: 0.07, padType: 'sine' },
-  heights: { root: 164.81, chords: [[0, 4, 7, 14], [-3, 2, 4, 9], [-5, -1, 2, 7], [-7, 0, 4, 7]], scale: [0, 2, 4, 7, 9, 12, 14], padVol: 0.04, leadVol: 0.06, filter: 1600, bass: 0.03, leadType: 'sine' },
-  spire: { root: 98, chords: [[0, 3, 7, 12], [-1, 3, 6, 10], [0, 5, 8, 12], [-2, 1, 5, 12]], scale: [0, 1, 3, 5, 7, 8, 10], padVol: 0.05, leadVol: 0.04, filter: 700, bass: 0.08, padType: 'sawtooth' },
+  rootshade: { root: 110, chords: [[0, 7, 12, 16], [-2, 5, 10, 14], [-4, 3, 8, 12], [-2, 5, 10, 15]], scale: [0, 2, 4, 7, 9, 11], padVol: 0.05, leadVol: 0.05, filter: 800, bass: 0.06 },
+  fernwake: { root: 130.81, chords: [[0, 4, 7, 11], [2, 5, 9, 12], [-3, 0, 4, 7], [-5, -1, 2, 7]], scale: [0, 2, 4, 5, 7, 9, 11], padVol: 0.045, leadVol: 0.06, filter: 1200, bass: 0.05, leadType: 'triangle' },
+  drownwell: { root: 82.41, chords: [[0, 3, 7, 10], [-4, 0, 3, 7], [-2, 1, 5, 8], [0, 3, 7, 14]], scale: [0, 3, 5, 7, 10], padVol: 0.05, leadVol: 0.035, filter: 500, bass: 0.07, padType: 'sine' },
+  chimeglass: { root: 164.81, chords: [[0, 4, 7, 14], [-3, 2, 4, 9], [-5, -1, 2, 7], [-7, 0, 4, 7]], scale: [0, 2, 4, 7, 9, 12, 14], padVol: 0.04, leadVol: 0.06, filter: 1600, bass: 0.03, leadType: 'sine' },
+  bramblehush: { root: 98, chords: [[0, 3, 7, 10], [-2, 2, 5, 9], [-4, 0, 3, 7], [-5, -2, 2, 5]], scale: [0, 3, 5, 7, 8, 10], padVol: 0.045, leadVol: 0.04, filter: 700, bass: 0.05, padType: 'triangle' },
+  puffcap: { root: 146.83, chords: [[0, 4, 7, 9], [2, 5, 9, 11], [-3, 0, 4, 9], [-1, 2, 7, 11]], scale: [0, 2, 4, 7, 9], padVol: 0.04, leadVol: 0.06, filter: 1400, bass: 0.04, leadType: 'triangle' },
+  lanternry: { root: 123.47, chords: [[0, 4, 7, 11], [-3, 0, 4, 7], [-5, -1, 2, 7], [-7, -3, 0, 4]], scale: [0, 2, 4, 5, 7, 9, 11], padVol: 0.045, leadVol: 0.05, filter: 1000, bass: 0.05, padType: 'sine', leadType: 'sine' },
+  cinderthroat: { root: 98, chords: [[0, 3, 7, 12], [-1, 3, 6, 10], [0, 5, 8, 12], [-2, 1, 5, 12]], scale: [0, 1, 3, 5, 7, 8, 10], padVol: 0.05, leadVol: 0.04, filter: 700, bass: 0.08, padType: 'sawtooth' },
   boss: { root: 73.42, chords: [[0, 3, 7], [0, 3, 6], [-1, 2, 6], [0, 3, 7]], scale: [0, 1, 3, 6, 7, 10], padVol: 0.06, leadVol: 0.05, filter: 900, bass: 0.1, padType: 'sawtooth', leadType: 'square' },
 };

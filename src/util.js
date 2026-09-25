@@ -1,6 +1,6 @@
 // ---- Shared constants & helpers -------------------------------------------
 const TILE = 16;
-const VIEW_W = 480, VIEW_H = 270;
+const VIEW_W = 427, VIEW_H = 240; // logical view size (world px); the canvas is native resolution
 const TAU = Math.PI * 2;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

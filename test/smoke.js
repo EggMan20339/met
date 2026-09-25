@@ -18,6 +18,8 @@ const server = http.createServer((req, res) => {
   const hold = async (key, ms) => { await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); };
   await page.screenshot({ path: path.join(outDir, '01-title.png') });
   await page.keyboard.press('Enter'); await page.waitForTimeout(600);
+  await page.screenshot({ path: path.join(outDir, '01b-intro.png') });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(outDir, '02-start.png') });
   const state = async () => page.evaluate(() => { const g = window.game, p = g.player; return { state: g.state, x: +p.x.toFixed(1), y: +p.y.toFixed(1), hp: p.hp, onGround: p.onGround, area: g.area, fps: g.fpsEstimate, particles: g.fx.ps.length }; });
   const s0 = await state();
@@ -31,7 +33,7 @@ const server = http.createServer((req, res) => {
   await page.keyboard.press('Escape'); await page.waitForTimeout(300); await page.screenshot({ path: path.join(outDir, '06-pause.png') }); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   const sResumed = await state();
   // area tour: teleport around the world for visual checks of every palette
-  const tour = [['10-mossgrove', 200, 91], ['11-depths', 45, 110], ['12-heights', 52, 34], ['13-spire', 190, 27], ['14-westcaves', 60, 78]];
+  const tour = [['10-fernwake', 200, 91], ['11-drownwell', 45, 110], ['12-chimeglass', 52, 34], ['13-cinderthroat', 254, 27], ['14-bramblehush', 20, 73], ['15-puffcap', 230, 134], ['16-lanternry', 200, 27], ['17-cradle', 70, 65]];
   for (const [name, tx, ty] of tour) {
     await page.evaluate(([tx, ty]) => { const g = window.game, p = g.player; p.x = tx * 16 + 3; p.y = ty * 16 + 16 - p.h; p.vx = 0; p.vy = 0; p.invuln = 1e9; g.cam.x = p.x - 240; g.cam.y = p.y - 135; g.ui.areaTitle = null; }, [tx, ty]);
     await page.waitForTimeout(700); await page.screenshot({ path: path.join(outDir, name + '.png') });
@@ -42,7 +44,7 @@ const server = http.createServer((req, res) => {
   const sBench = await page.evaluate(() => ({ sitting: window.game.player.sitting, saved: !!localStorage.getItem('glimmerdeep_save_v1') }));
   await page.reload(); await page.waitForTimeout(600);
   const sTitle = await page.evaluate(() => ({ state: window.game.state, hasSave: window.game.hasSave }));
-  await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(400); // Continue (no intro)
   const sLoaded = await page.evaluate(() => { const g = window.game, p = g.player; return { state: g.state, dash: p.abilities.dash, x: Math.round(p.x), benchX: Math.round(g.benchPos.x) }; });
   // measure frame time
   const perf = await page.evaluate(() => new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (n < 120) requestAnimationFrame(f); else res((performance.now() - t0) / n); }; requestAnimationFrame(f); }));

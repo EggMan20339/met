@@ -66,5 +66,6 @@ class Input {
       focus: this.isHeld('focus'),
     };
   }
+  // Presses persist until a game tick has actually consumed them (never dropped on idle frames or hit-stop)
   endTick() { this.pressed = {}; this.released = {}; this.anyKeyPressed = false; }
 }
