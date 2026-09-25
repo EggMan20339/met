@@ -132,15 +132,16 @@ class UI {
     const c = this.ctx; const t = G.time; const W = this.W, H = this.H;
     c.fillStyle = 'rgba(4,3,12,0.55)'; c.fillRect(0, 0, W, H);
     const gl = 0.6 + Math.sin(t * 1.5) * 0.25;
-    if (Art.ready && Art.has('logo')) { c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(W / 2, H * 0.3, 0, W / 2, H * 0.3, 120); g.addColorStop(0, `rgba(255,170,90,${gl * 0.35})`); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); c.restore(); Art.draw(c, 'logo', W / 2, H * 0.3, { scale: Math.min(0.72, (W - 40) / 420) }); }
+    const logo = Art.ready && Art.has('logo');
+    if (logo) { c.save(); c.globalCompositeOperation = 'lighter'; const g = c.createRadialGradient(W / 2, H * 0.3, 0, W / 2, H * 0.3, 120); g.addColorStop(0, `rgba(255,170,90,${gl * 0.35})`); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); c.restore(); Art.draw(c, 'logo', W / 2, H * 0.3, { scale: Math.min(0.72, (W - 40) / 420) }); }
     else this.glowText('GLIMMERDEEP', W / 2, H * 0.3, 40, '#fff4e0', `rgba(255,180,100,${gl})`);
-    this.text('a spark against the hush', W / 2, H * 0.3 + 26, 11, '#e0d0c0', 'center', false, 0.9);
+    this.text('a spark against the hush', W / 2, H * 0.3 + (logo ? 37 : 26), 11, '#e0d0c0', 'center', false, 0.9);
     const opts = G.hasSave ? ['Continue', 'New Game'] : ['New Game'];
     opts.forEach((o, i) => { const sel = i === this.menuIdx; this.text((sel ? '✦ ' : '') + o + (sel ? ' ✦' : ''), W / 2, H * 0.58 + i * 18, sel ? 13 : 11, sel ? '#ffffff' : '#9a92c0', 'center', sel); });
     if (G.hasSave && this.menuIdx === 1) this.text('(erases your current journey)', W / 2, H * 0.58 + 36, 7.5, '#a08090', 'center');
     this.text('Z / Space / K · jump      X / J · strike      C / Shift / L · windstep      V / E · tap to throw a cinder, hold to rekindle', W / 2, H - 30, 7.5, '#8a82b0', 'center');
     this.text('Arrows / WASD to move  ·  M for map  ·  Esc to pause  ·  gamepad supported', W / 2, H - 18, 7.5, '#8a82b0', 'center');
-    if (!G.audioStarted) this.text('(press any key to begin — sound starts on first input)', W / 2, H * 0.3 + 46, 7.5, '#6f6890', 'center');
+    if (!G.audioStarted) this.text('(press any key to begin — sound starts on first input)', W / 2, H * 0.3 + (logo ? 53 : 46), 7.5, '#6f6890', 'center');
   }
   drawIntro(G) {
     const c = this.ctx; const it = this.intro; const W = this.W, H = this.H;

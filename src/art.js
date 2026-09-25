@@ -11,11 +11,13 @@ const ART_SCALE = {
 };
 const ART_ANCHORS = { bottom: [0.5, 1], center: [0.5, 0.5], topleft: [0, 0], bottomleft: [0, 1] };
 const Art = {
-  imgs: {}, cache: new Map(), zoom: 1, ready: false, loaded: 0, total: 0, failed: [], queue: [], bgKept: 6,
+  imgs: {}, cache: new Map(), zoom: 1, ready: false, loaded: 0, total: 0, failed: [], queue: [], bgKept: 10,
   load() {
     if (typeof ART_SVGS === 'undefined' || typeof Image === 'undefined') return;
     const names = Object.keys(ART_SVGS); this.total = names.length;
-    const done = () => { if (this.loaded + this.failed.length >= this.total) { this.ready = true; this.queue = names.slice().sort((a, b) => (b.startsWith('bg_') ? 1 : 0) - (a.startsWith('bg_') ? 1 : 0)); } };
+    // once everything has decoded, the sprites are rasterised ahead of time one per frame; backgrounds are large
+    // (up to 2048x1280 each) so only the current and neighbouring areas' layers are ever resident (see queueBg)
+    const done = () => { if (this.loaded + this.failed.length >= this.total) { this.ready = true; this.queue = names.filter((n) => !n.startsWith('bg_')); } };
     for (const name of names) {
       const img = new Image();
       img.onload = () => { this.loaded++; this.imgs[name] = img; done(); };
@@ -25,13 +27,16 @@ const Art = {
   },
   has(name) { return !!this.imgs[name]; },
   scale(name) { return ART_SCALE[name.split('_')[0]] || 1; },
-  setZoom(z) { if (z !== this.zoom) { this.zoom = z; this.cache.clear(); } },
+  // On a zoom change the sprites are dropped (cheap to redo); background rasters carry their own pixel scale in
+  // their key, so the ones still valid are kept and the rest age out of the LRU
+  setZoom(z) { if (z === this.zoom) return; this.zoom = z; for (const k of [...this.cache.keys()]) if (!k.startsWith('bg_')) this.cache.delete(k); },
   // pixels per SVG unit at which `name` is rasterised for the current zoom (backgrounds pass their own)
   pxFor(name) { return Math.min(8, this.scale(name) * this.zoom); },
   // an offscreen canvas holding `name` drawn at `px` pixels per SVG unit (cached per zoom)
   raster(name, px) {
     const img = this.imgs[name]; if (!img) return null;
-    const key = name + '@' + px.toFixed(3); const hit = this.cache.get(key); if (hit) return hit;
+    const key = name + '@' + px.toFixed(3); const hit = this.cache.get(key);
+    if (hit) { this.cache.delete(key); this.cache.set(key, hit); return hit; } // re-insert so the map's order is least-recently-used first
     const m = ART_META[name]; const c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(m.w * px)); c.height = Math.max(1, Math.ceil(m.h * px));
     const x = c.getContext('2d'); x.imageSmoothingEnabled = true; x.drawImage(img, 0, 0, c.width, c.height);
     if (name.startsWith('bg_')) { // keep only a few painted backgrounds resident; they are large
@@ -48,10 +53,15 @@ const Art = {
     ctx.save(); ctx.translate(x, y); if (o.rot) ctx.rotate(o.rot); ctx.scale((o.flip ? -1 : 1) * (o.sx || 1), o.sy || 1); if (o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
     ctx.drawImage(c, -a[0] * w, -a[1] * h, w, h); ctx.restore(); return true;
   },
-  // Rasterise one queued asset per call (the game calls this every frame on the title and intro screens)
+  // Ask for background layers (the neighbouring areas', when an area is entered) to be rasterised ahead of time.
+  // Layers already resident are marked recently used so they are not the next to be evicted.
+  queueBg(names, px) {
+    for (const n of names) { if (!this.imgs[n]) continue; const key = n + '@' + px.toFixed(3); const hit = this.cache.get(key); if (hit) { this.cache.delete(key); this.cache.set(key, hit); } else if (!this.queue.includes(n)) this.queue.push(n); }
+  },
+  // Rasterise one queued asset per call (the game calls this every frame; the queue is short-lived)
   prewarm(bgPx) {
     if (!this.ready || !this.queue.length) return;
-    const name = this.queue.shift(); if (name.startsWith('bg_')) { if (bgPx) this.raster(name, bgPx); else this.queue.push(name); } else this.raster(name, this.pxFor(name));
+    const name = this.queue.shift(); this.raster(name, name.startsWith('bg_') ? (bgPx || 1) : this.pxFor(name));
   },
 };
 Art.load();

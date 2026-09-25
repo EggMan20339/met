@@ -100,7 +100,7 @@ class Renderer {
     this.bgc = document.createElement('canvas'); this.bctx = this.bgc.getContext('2d');
     this.rock = document.createElement('canvas'); this.rctx = this.rock.getContext('2d');
     this.scratch = document.createElement('canvas'); this.scratch.width = 256; this.scratch.height = 256; this.sctx = this.scratch.getContext('2d');
-    this.curArea = null; this.prevArea = null; this.areaFade = 1;
+    this.curArea = null; this.prevArea = null; this.areaFade = 1; this.neighbors = null; this.bgQueuedFor = null;
     this.textures = {}; this.rockGen = 0; this.rockKey = ''; this.rebuild();
   }
   setSize(W, H, zoom) { this.W = W; this.H = H; this.zoom = zoom; this.LS = 0.5; this.dark.width = Math.ceil(W * this.LS); this.dark.height = Math.ceil(H * this.LS); this.glow.width = this.dark.width; this.glow.height = this.dark.height; this.bgc.width = this.dark.width; this.bgc.height = this.dark.height; this.rock.width = W; this.rock.height = H; this.bgPx = Math.min(2, zoom * this.LS * this.bgFit(H / zoom)); }
@@ -264,8 +264,17 @@ class Renderer {
     layers.push({ c: far, f: 0.15 }); layers.push({ c: silhouette(0.55, 34, 1.6), f: 0.32 }); layers.push({ c: silhouette(0.85, 30, 1.0), f: 0.55 });
     return (this.bgs[area] = { layers, pal, W, H, S });
   }
+  // areas whose rooms come within two tiles of each other: their backgrounds are rasterised ahead of the player
+  areaNeighbors(area) {
+    if (!this.neighbors) {
+      this.neighbors = {}; const A = this.world.map.areas; const touch = (r, s) => r[0] < s[0] + s[2] + 2 && s[0] < r[0] + r[2] + 2 && r[1] < s[1] + s[3] + 2 && s[1] < r[1] + r[3] + 2;
+      for (const a of A) this.neighbors[a.id] = A.filter((b) => b !== a && a.rects.some((r) => b.rects.some((s) => touch(r, s)))).map((b) => b.id);
+    }
+    return this.neighbors[area] || [];
+  }
   drawBackground(ctx, cam, area, t, viewW, viewH) {
     if (this.curArea !== area) { this.prevArea = this.curArea; this.curArea = area; this.areaFade = 0; }
+    if (Art.ready && this.bgQueuedFor !== area) { this.bgQueuedFor = area; Art.queueBg(this.areaNeighbors(area).flatMap((a) => ['bg_' + a + '_far', 'bg_' + a + '_near']), this.bgPx); }
     this.areaFade = Math.min(1, this.areaFade + 0.016);
     const z = this.zoom * this.LS, b = this.bctx, BW = this.bgc.width, BH = this.bgc.height;
     const draw = (a, alpha) => {

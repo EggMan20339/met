@@ -28,7 +28,8 @@ function motePose(p) {
 }
 function drawPlayer(ctx, p, t) {
   if (p.dead) return;
-  if (!Art.ready || !Art.has('mote_idle')) return drawPlayerProc(ctx, p, t);
+  const pose = Art.ready ? motePose(p) : null;
+  if (!pose || !Art.has('mote_' + pose)) return drawPlayerProc(ctx, p, t);
   const cx = p.x + p.w / 2, feet = p.y + p.h;
   ctx.save();
   let alpha = 1;
@@ -41,7 +42,7 @@ function drawPlayer(ctx, p, t) {
     ctx.globalCompositeOperation = 'source-over';
   }
   ctx.globalAlpha = alpha;
-  const pose = motePose(p); const moving = p.onGround && Math.abs(p.vx) > 20;
+  const moving = p.onGround && Math.abs(p.vx) > 20;
   const flip = pose === 'cling' ? p.wallDir > 0 : p.facing < 0; // the cling pose is drawn with the wall on its left
   if (p.dashing > 0) for (let i = 1; i <= 3; i++) Art.draw(ctx, 'mote_dash', cx - p.dashDir * i * 7, feet, { flip, alpha: 0.3 - i * 0.07 });
   let sx = 1, sy = 1;
