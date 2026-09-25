@@ -7,7 +7,8 @@
     "start": "npx --yes serve -l 8080 .",
     "check": "node tools/checkmap.js",
     "solve": "node tools/solver.js --abilities dash,walljump,doublejump",
-    "test": "node tools/checkmap.js && node test/smoke.js && node test/combat.js && node test/boss.js"
+    "gates": "node tools/gates.js",
+    "test": "node tools/checkmap.js && node test/input.js && node test/smoke.js && node test/combat.js && node test/boss.js"
   },
   "devDependencies": {
     "playwright": "^1.56.1"

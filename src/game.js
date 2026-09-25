@@ -54,7 +54,7 @@ class Game {
   }
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const ww = window.innerWidth, wh = window.innerHeight; const W = Math.max(64, Math.round(ww * dpr)), H = Math.max(64, Math.round(wh * dpr));
+    const ww = window.innerWidth, wh = window.innerHeight; const rs = this.renderScale || 1; const W = Math.max(64, Math.round(ww * dpr * rs)), H = Math.max(64, Math.round(wh * dpr * rs));
     this.canvas.width = W; this.canvas.height = H; this.canvas.style.width = ww + 'px'; this.canvas.style.height = wh + 'px';
     const stage = document.getElementById('stage'); stage.style.width = ww + 'px'; stage.style.height = wh + 'px';
     this.uiCanvas.style.width = ww + 'px'; this.uiCanvas.style.height = wh + 'px';
@@ -104,11 +104,20 @@ class Game {
     if (!this.audioStarted && this.input.anyKeyPressed) { this.audio.init(); this.audioStarted = true; }
     this.audio.resume();
     this.time += dtReal;
+    this.adaptQuality(dtReal);
     const STEP = 1 / 60; this.acc += dtReal * this.fx.slowmo; let steps = 0;
     while (this.acc >= STEP && steps < 5) { this.tick(STEP); this.acc -= STEP; steps++; }
     if (this.acc > STEP * 5) this.acc = STEP * 5;
     this.ui.update(dtReal, this.audioStarted ? this.audio : null);
     this.render();
+  }
+  // Adaptive resolution: if frames run long for a while, render at a lower internal scale (and recover when they are fast)
+  adaptQuality(dt) {
+    this.frameAvg = lerp(this.frameAvg || dt, dt, 0.05); this.qualityT = (this.qualityT || 0) + dt;
+    if (this.qualityT < 2.5) return; this.qualityT = 0;
+    const rs = this.renderScale || 1;
+    if (this.frameAvg > 1 / 38 && rs > 0.5) { this.renderScale = Math.max(0.5, +(rs - 0.15).toFixed(2)); this.resize(); }
+    else if (this.frameAvg < 1 / 75 && rs < 1) { this.renderScale = Math.min(1, +(rs + 0.15).toFixed(2)); this.resize(); }
   }
   tick(dt) {
     const inp = this.input; const st = this.state;
