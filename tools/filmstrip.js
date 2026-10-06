@@ -6,6 +6,9 @@
 //   node tools/filmstrip.js --subject boss:bell --skip 2500 --frames 24 --every 4
 //   node tools/filmstrip.js --subject decor:B --frames 12 --every 6      (hearth)    decor types: B T + L G h N W Q K
 //   node tools/filmstrip.js --subject pickup:H --frames 12 --every 6
+//   node tools/filmstrip.js --subject tile:% --scenario bounce            (a puffcap; the player drops onto it)
+//   node tools/filmstrip.js --subject decor:B --lit --active              (a kindled hearth that is the current rest point)
+//   node tools/filmstrip.js --subject boss:lightless --skip 2500 --set '{"phase":3,"hp":8}'   (--set applies to the boss once it has appeared)
 //
 // Options: --frames N (default 16), --every K (capture every K rendered frames, default 3), --skip ms (wait before capturing),
 // --set JSON (assign fields on the subject before capturing), --poke (strike the subject once capturing starts),
@@ -30,7 +33,7 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
   await page.keyboard.press('Enter'); await page.waitForTimeout(300); await page.keyboard.press('Escape'); await page.waitForTimeout(500);
   const hold = async (key, ms) => { await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); };
   // ---- place the subject and the player, install the capture hook
-  const info = await page.evaluate(([subject, scenario, setJson, size, frames, every]) => {
+  const info = await page.evaluate(([subject, scenario, setJson, size, frames, every, flags]) => {
     const g = window.game, p = g.player; const set = setJson ? JSON.parse(setJson) : null; g.ui.areaTitle = null; g.hint = null;
     const [kind, type] = subject.split(':'); let target = null, rect = null; let w = size[0] || 80, h = size[1] || 64;
     const tp = (x, y) => { p.x = x; p.y = y; p.vx = 0; p.vy = 0; p.invuln = 1e9; p.flareCd = 1e9; p.hp = p.maxHp; g.cam.x = x - g.viewW / 2; g.cam.y = y - g.viewH / 2; g.clampCam(); };
@@ -58,7 +61,13 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
     } else if (kind === 'decor') {
       const d = g.decor.find((q) => q.type === type); if (!d) return { error: 'no decor ' + type }; target = d; if (type === 'h' && !size[0]) { w = 170; h = 120; }
       tp(d.tx * 16 - 50, d.ty * 16 + 16 - p.h); if (type === 'G') g.world.closedGates.add(d.tx + ',' + d.ty); if (set) Object.assign(d, set);
+      if (flags.lit) g.benchesSeen.push([d.tx, d.ty]); if (flags.active) g.benchPos = { x: d.tx * 16 + 3, y: d.ty * 16 + 16 - p.h };
       rect = () => ({ x: d.tx * 16 + 8 - w / 2, y: d.ty * 16 + 16 - h + 8 });
+    } else if (kind === 'tile') {
+      const W = g.world; let found = null; for (let y = 0; y < W.h && !found; y++) for (let x = 0; x < W.w; x++) if (W.tile(x, y) === type) { found = [x, y]; break; }
+      if (!found) return { error: 'no tile ' + type }; target = { tx: found[0], ty: found[1] };
+      if (scenario === 'bounce') tp(found[0] * 16 + 8 - p.w / 2, found[1] * 16 - 70); else tp(found[0] * 16 - 50, found[1] * 16 + 16 - p.h);
+      rect = () => ({ x: found[0] * 16 + 8 - w / 2, y: found[1] * 16 + 16 - h + 8 });
     } else if (kind === 'pickup') {
       const pk = g.pickups.find((q) => q.type === type); if (!pk) return { error: 'no pickup ' + type }; target = pk; pk.visible = true; pk.taken = false;
       tp(pk.x - 60, pk.y + 30); if (set) Object.assign(pk, set);
@@ -75,13 +84,14 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
       cap.n++; if (cap.n >= frames) cap.done = true; };
     window.__cap = { cap, strip, arm: () => { cap.armed = true; cap.t0 = g.time; }, target };
     return { ok: true, zoom: z, w, h, area: g.area };
-  }, [subject, scenario, setJson, size, frames, every]);
+  }, [subject, scenario, setJson, size, frames, every, { lit: has('lit'), active: has('active') }]);
   if (info.error) { console.error(info.error); process.exit(1); }
   const arm = () => page.evaluate(() => window.__cap.arm());
   const poke = () => page.evaluate(() => { const g = window.game; const t = window.__cap.target; if (t && t.def) damageEnemy(t, 1, t.x - 20, 'right', false); else if (g.boss) damageBoss(g.boss, 1); });
   const [kind] = subject.split(':');
   if (kind === 'boss') { const dir = info && (await page.evaluate(() => window.__cap.target.dir)); await hold(dir > 0 ? 'ArrowRight' : 'ArrowLeft', 1500); }
   if (skip) await page.waitForTimeout(skip);
+  if (kind === 'boss' && setJson) await page.evaluate((s) => { if (window.game.boss) Object.assign(window.game.boss, JSON.parse(s)); }, setJson);
   if (kind === 'player') {
     const sc = scenario;
     if (sc === 'run') { await page.keyboard.down('ArrowRight'); await page.waitForTimeout(350); await arm(); await page.waitForTimeout(20 * every * frames); await page.keyboard.up('ArrowRight'); }
