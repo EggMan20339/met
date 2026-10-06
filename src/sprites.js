@@ -12,6 +12,18 @@ function drawSpriteMaybeFlash(ctx, R, e, drawFn) {
   else drawFn(ctx);
 }
 const ABILITY_COLORS = { 1: '#5ad8ff', 2: '#8cff9a', 3: '#d49aff', 4: '#ffb347' };
+// ---- live puppets: which art module (src/artsrc.js, built from tools/art/) animates each entity type
+const PUPPET_OF = {
+  enemy: { e: 'dimling', f: 'hushmoth', s: 'sporeling', c: 'rootram', g: 'snuffer', a: 'emberback', r: 'gloamwing', j: 'springfoot', k: 'husk' },
+  decor: { B: 'hearth', T: 'lamp', '+': 'crystal', N: 'wick', W: 'bramble', Q: 'tallow', K: 'ringer' },
+  pickup: 'pickups', boss: { gulletroot: 'gulletroot', bell: 'bell', lightless: 'lightless' },
+};
+function liveDef(name) { const d = name && typeof ARTSRC !== 'undefined' ? ARTSRC[name] : null; return d && d.make && d.control && d.params ? d : null; }
+// run the module's control for this frame and return the puppet, ready to draw
+function livePuppet(ent, def, info) {
+  const scale = typeof def.scale === 'function' ? def.scale(ent) : (def.scale || Art.scale(def.name));
+  const pup = puppetFor(ent, def, scale); pup.scale = scale; def.control(ent, pup, Object.assign({ dt: Puppet.dt, t: Puppet.time }, info)); pup.update(Puppet.dt); return pup;
+}
 
 // ---------- Player: Mote, a small luminous spirit (illustrated poses from art/mote_*.svg; procedural fallback below)
 function motePose(p) {
@@ -27,6 +39,25 @@ function motePose(p) {
   return 'idle';
 }
 function drawPlayer(ctx, p, t) {
+  if (p.dead) return;
+  const def = typeof ARTSRC !== 'undefined' && ARTSRC.mote && ARTSRC.mote.control ? ARTSRC.mote : null;
+  if (!def) return drawPlayerArt(ctx, p, t);
+  // live puppet: the template is drawn with tweened parameters driven by the player's state
+  const pup = puppetFor(p, def, Art.scale('mote')); def.control(p, pup, { dt: Puppet.dt, t }); pup.update(Puppet.dt);
+  const cx = p.x + p.w / 2, feet = p.y + p.h;
+  ctx.save();
+  let alpha = 1;
+  if (p.hazardTimer > 0) alpha = clamp(p.hazardTimer / 0.55, 0, 1);
+  else if (p.invuln > 0 && p.flareCd < 1.8 && Math.floor(t * 28) % 2 === 0) alpha = 0.4;
+  ctx.globalAlpha = alpha;
+  const flip = p.wallSliding ? p.wallDir > 0 : p.facing < 0; // the cling pose is drawn with the wall on its left
+  if (pup.ghosts.length) pup.drawGhosts(ctx, { flip });
+  ctx.globalCompositeOperation = 'lighter'; const gk = pup.P.glow; const gg = ctx.createRadialGradient(cx, feet - 12, 2, cx, feet - 12, 16 + gk * 8); gg.addColorStop(0, rgba(p.focusing || p.warm ? '#ffd080' : '#b8c4ff', 0.12 + gk * 0.4)); gg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(cx, feet - 12, 16 + gk * 8, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over';
+  pup.draw(ctx, cx, feet, { flip });
+  if (p.focusing) { const k = p.focusTimer / PHYS.FOCUS_TIME; ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = rgba('#ffe0a0', 0.5 + k * 0.4); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, feet - 12, 15 - k * 8, 0, TAU); ctx.stroke(); ctx.globalCompositeOperation = 'source-over'; }
+  ctx.restore();
+}
+function drawPlayerArt(ctx, p, t) {
   if (p.dead) return;
   const pose = Art.ready ? motePose(p) : null;
   if (!pose || !Art.has('mote_' + pose)) return drawPlayerProc(ctx, p, t);
@@ -134,6 +165,12 @@ function drawEnemyArt(c, e, pose, cx, cy, bottom, t) {
 function drawEnemy(ctx, R, e, t) {
   if (!e.alive) return;
   const D = e.def; const cx = e.x + e.w / 2, cy = e.y + e.h / 2, bottom = e.y + e.h;
+  const def = liveDef(PUPPET_OF.enemy[e.type]);
+  if (def) { // live puppet: the module animates itself from the enemy's state; ground creatures stand on the hitbox bottom
+    const pup = livePuppet(e, def, {}); const flip = def.flip ? def.flip(e, pup) : e.facing < 0; const x = cx, y = def.anchor === 'bottom' ? bottom : cy;
+    drawSpriteMaybeFlash(ctx, R, e, (c) => { if (def.before) def.before(c, e, pup, { t }); if (pup.ghosts.length) pup.drawGhosts(c, { flip }); pup.draw(c, x, y, { flip }); if (def.after) def.after(c, e, pup, { t }); });
+    return;
+  }
   const pose = Art.ready ? enemyPose(e) : null;
   const draw = pose && Art.has(pose) ? (c) => drawEnemyArt(c, e, pose, cx, cy, bottom, t) : (c) => {
     c.save();
@@ -261,6 +298,8 @@ function drawLightless(ctx, R, b, t) {
     if (b.state === 'charge_tele' || b.state === 'roar' || b.state === 'beam_tele') c.translate((Math.random() - 0.5) * 3, 0);
     const squash = b.state === 'leap_tele' ? 0.82 : b.state === 'leap' ? 1.12 : b.state === 'slam' ? 0.88 : 1;
     c.scale(1 / squash, squash);
+    const def = liveDef(PUPPET_OF.boss.lightless);
+    if (def) { c.restore(); c.save(); const pup = livePuppet(b, def, { t }); if (def.before) def.before(c, b, pup, { t }); pup.draw(c, cx, bottom, { flip: b.facing < 0 }); if (def.after) def.after(c, b, pup, { t }); c.restore(); return; }
     const name = b.state === 'charge_tele' || b.state === 'charge' ? 'lightless_charge' : b.state === 'leap_tele' || b.state === 'leap' || b.state === 'slam' ? 'lightless_leap' : b.state === 'stun' ? 'lightless_stun' : b.phase === 3 ? 'lightless_phase3' : b.phase >= 2 ? 'lightless_phase2' : 'lightless_idle';
     if (Art.ready && Art.has(name)) {
       Art.draw(c, name, 0, 0);
@@ -297,6 +336,8 @@ function drawGulletroot(ctx, R, b, t) {
     c.translate(cx, floor); const rise = floor - b.y; // how far it has surfaced (0..h)
     c.translate(0, -(rise - b.h)); c.scale(b.facing, 1);
     if (b.state === 'thorns_tele' || b.state === 'emerge') c.translate((Math.random() - 0.5) * 2, 0);
+    const def = liveDef(PUPPET_OF.boss.gulletroot);
+    if (def) { c.restore(); c.save(); c.beginPath(); c.rect(b.x - 60, floor - 200, b.w + 120, 200); c.clip(); const pup = livePuppet(b, def, { t }); if (def.before) def.before(c, b, pup, { t }); pup.draw(c, cx, b.y + b.h, { flip: b.facing < 0 }); if (def.after) def.after(c, b, pup, { t }); c.restore(); return; }
     const name = b.state === 'spit' || b.state === 'lash' ? 'gulletroot_open' : b.state === 'thorns_tele' ? 'gulletroot_tele' : 'gulletroot_closed';
     if (Art.ready && Art.has(name)) { const open = name === 'gulletroot_open'; Art.draw(c, name, 0, 0, { sy: open ? 1.03 : 1 + Math.sin(t * 2) * 0.015 }); c.globalCompositeOperation = 'lighter'; c.fillStyle = rgba('#c8ff5a', 0.12 + (open ? 0.2 : 0)); c.beginPath(); c.ellipse(0, -22, 18, 8, 0, 0, TAU); c.fill(); c.restore(); return; }
     // roots fanning out
@@ -326,6 +367,8 @@ function drawBell(ctx, R, b, t) {
     c.save(); c.translate(cx, cy);
     if (b.state === 'toll_tele') c.translate((Math.random() - 0.5) * 4, 0);
     const tilt = b.state === 'stunned' ? 0.35 : Math.sin(b.anim * 1.2) * 0.08; c.rotate(tilt);
+    const def = liveDef(PUPPET_OF.boss.bell);
+    if (def) { c.restore(); c.save(); const pup = livePuppet(b, def, { t }); if (def.before) def.before(c, b, pup, { t }); pup.draw(c, cx, cy, { flip: b.facing < 0 }); if (def.after) def.after(c, b, pup, { t }); c.restore(); return; }
     const name = b.state === 'toll_tele' || b.state === 'toll' ? 'bell_toll' : b.state === 'stunned' ? 'bell_stunned' : 'bell_hover';
     if (Art.ready && Art.has(name)) { Art.draw(c, name, 0, 0, { sy: b.state === 'slam' ? 1.1 : 1 + Math.sin(b.anim * 3) * 0.02 }); c.globalCompositeOperation = 'lighter'; const pulse = b.state === 'toll_tele' ? 0.6 : 0.25 + Math.sin(t * 3) * 0.1; const cg = c.createRadialGradient(0, -6, 0, 0, -6, 14); cg.addColorStop(0, rgba('#ffffff', pulse)); cg.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = cg; c.beginPath(); c.arc(0, -6, 14, 0, TAU); c.fill(); c.restore(); return; }
     // tentacles
@@ -366,6 +409,8 @@ function drawProjectile(ctx, pr, t) {
 const GIFT_ART = { 1: 'gift_windstep', 2: 'gift_rootgrip', 3: 'gift_skyleaf', 4: 'gift_cinder' };
 function drawPickup(ctx, pk, t) {
   if (pk.taken) return;
+  const live = liveDef(PUPPET_OF.pickup);
+  if (live) { const pup = livePuppet(pk, live, { t }); if (live.before) live.before(ctx, pk, pup, { t }); pup.draw(ctx, pk.x, pk.y, {}); if (live.after) live.after(ctx, pk, pup, { t }); return; }
   const name = pk.type === 'H' ? 'petal' : pk.type === 'S' ? 'heartwood' : pk.type === '*' ? 'heart' : GIFT_ART[pk.type];
   if (!Art.ready || !name || !Art.has(name)) return drawPickupProc(ctx, pk, t);
   const bob = Math.sin(t * 2.2 + pk.t) * 2; const x = pk.x, y = pk.y + bob;
@@ -421,6 +466,11 @@ function hearthLit(ent, game) {
 function drawDecorArt(ctx, ent, t, st) {
   const x = ent.tx * TILE, y = ent.ty * TILE; const bx = x + 8, by = y + TILE;
   const glowAt = (gx, gy, r, color, a) => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r); g.addColorStop(0, rgba(color, a)); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(gx - r, gy - r, r * 2, r * 2); ctx.restore(); };
+  const def = liveDef(PUPPET_OF.decor[ent.type]);
+  if (def) { // live puppet (friends, hearths, lamps, crystals): bottom-centre of the tile; the module draws its own glow
+    const game = st.game; const lit = ent.type === 'B' ? hearthLit(ent, game) : true; const active = ent.type === 'B' && game && Math.abs(game.benchPos.x - (x + 3)) < 2 && Math.abs(game.benchPos.y - (y + TILE - PH)) < 2;
+    const pup = livePuppet(ent, def, { t, game, lit, active, glowAt }); if (def.before) def.before(ctx, ent, pup, { t, lit, active, glowAt }); pup.draw(ctx, bx, by, {}); if (def.after) def.after(ctx, ent, pup, { t, lit, active, glowAt }); return true;
+  }
   switch (ent.type) {
     case 'B': {
       if (!Art.has('hearth') || !Art.has('hearth_cold')) return false;

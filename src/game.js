@@ -43,7 +43,7 @@ class Game {
     this.canvas = document.getElementById('game'); this.ctx = this.canvas.getContext('2d');
     this.uiCanvas = document.getElementById('ui'); this.ui = new UI(this.uiCanvas);
     this.input = new Input(); this.audio = new AudioSys(); this.fx = new FX();
-    this.world = new World(MAP); this.renderer = new Renderer(this.world);
+    this.world = new World(MAP); this.renderer = new Renderer(this.world); this.renderer.game = this;
     this.state = 'title'; this.time = 0; this.playtime = 0; this.deaths = 0; this.acc = 0; this.last = 0; this.fadeAlpha = 0; this.hint = null;
     this.hasSave = !!loadGame(); this.audioStarted = false; this.resetConfirm = false;
     this.cam = { x: 0, y: 0, lookX: 0 }; this.area = null; this.endingT = 0; this.deathT = 0; this.viewW = VIEW_W; this.viewH = VIEW_H; this.zoom = 1;
@@ -95,7 +95,7 @@ class Game {
     saveGame({ abilities: p.abilities, maxHp: p.maxHp, damage: p.damage, collected: [...this.collected], broken: this.world.brokenWalls, bench: this.benchPos, arenasDone: this.arenas.filter((a) => a.done).map((a) => a.id), deaths: this.deaths, playtime: this.playtime, explored: Array.from(this.explored), benchesSeen: this.benchesSeen, flags: this.flags, heartwood: this.heartwood, heartwoodUsed: this.heartwoodUsed });
     this.hasSave = true;
   }
-  newGame() { clearSave(); this.audio.setBoss(false); this.darkPhase = false; this.world = new World(MAP); this.renderer = new Renderer(this.world); this.renderer.setSize(this.canvas.width, this.canvas.height, this.zoom); this.explored.fill(0); this.benchesSeen = []; this.deaths = 0; this.playtime = 0; this.setupWorld(null); this.fx = new FX(); }
+  newGame() { clearSave(); this.audio.setBoss(false); this.darkPhase = false; this.world = new World(MAP); this.renderer = new Renderer(this.world); this.renderer.game = this; this.renderer.setSize(this.canvas.width, this.canvas.height, this.zoom); this.explored.fill(0); this.benchesSeen = []; this.deaths = 0; this.playtime = 0; this.setupWorld(null); this.fx = new FX(); }
   // ---------- main loop
   frame(t) {
     requestAnimationFrame((tt) => this.frame(tt));
@@ -109,6 +109,8 @@ class Game {
     while (this.acc >= STEP && steps < 5) { this.tick(STEP); this.acc -= STEP; steps++; }
     if (this.acc > STEP * 5) this.acc = STEP * 5;
     this.ui.update(dtReal, this.audioStarted ? this.audio : null);
+    // the live puppets animate per frame: slowed with slow motion, frozen on hit-stop and while paused
+    Puppet.dt = this.state === 'pause' || this.state === 'map' ? 0 : this.state === 'play' ? dtReal * this.fx.slowmo * (this.fx.hitstop > 0 ? 0.08 : 1) : dtReal; Puppet.time = this.time;
     this.render();
   }
   // Adaptive resolution: if frames run long for a while, render at a lower internal scale (and recover when they are fast)

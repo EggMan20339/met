@@ -100,7 +100,7 @@ class Renderer {
     this.bgc = document.createElement('canvas'); this.bctx = this.bgc.getContext('2d');
     this.rock = document.createElement('canvas'); this.rctx = this.rock.getContext('2d');
     this.scratch = document.createElement('canvas'); this.scratch.width = 256; this.scratch.height = 256; this.sctx = this.scratch.getContext('2d');
-    this.curArea = null; this.prevArea = null; this.areaFade = 1; this.neighbors = null; this.bgQueuedFor = null;
+    this.curArea = null; this.prevArea = null; this.areaFade = 1; this.neighbors = null; this.bgQueuedFor = null; this.tileEnts = new Map(); this.game = null;
     this.textures = {}; this.rockGen = 0; this.rockKey = ''; this.rebuild();
   }
   setSize(W, H, zoom) { this.W = W; this.H = H; this.zoom = zoom; this.LS = 0.5; this.dark.width = Math.ceil(W * this.LS); this.dark.height = Math.ceil(H * this.LS); this.glow.width = this.dark.width; this.glow.height = this.dark.height; this.bgc.width = this.dark.width; this.bgc.height = this.dark.height; this.rock.width = W; this.rock.height = H; this.bgPx = Math.min(2, zoom * this.LS * this.bgFit(H / zoom)); }
@@ -213,6 +213,8 @@ class Renderer {
         const g = ctx.createLinearGradient(0, py, 0, py + 5); g.addColorStop(0, pal.top); g.addColorStop(1, pal.edgeGlow); ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(px - 1, py, TILE + 2, 4.5, 2); ctx.fill();
         ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(px, py + 4, TILE, 1.2); ctx.fillStyle = pal.edgeGlow; ctx.beginPath(); ctx.roundRect(px + 2, py + 4, 2, 4, 1); ctx.roundRect(px + 12, py + 4, 2, 4, 1); ctx.fill();
       } else if (ch === '%') { // bounce shroom cap
+        const def = liveDef('puffcap');
+        if (def) { const key = tx + ',' + ty; let ent = this.tileEnts.get(key); if (!ent) { ent = { tx, ty, type: '%' }; this.tileEnts.set(key, ent); } const pup = livePuppet(ent, def, { t, game: this.game }); pup.draw(ctx, px + 8, py + 16, {}); continue; }
         const sq = 1 + Math.sin(t * 5 + tx) * 0.04;
         if (Art.ready && Art.draw(ctx, 'puffcap', px + 8, py + 16, { sx: 1 / sq, sy: sq })) continue;
         ctx.save(); ctx.translate(px + 8, py + 16); ctx.scale(1 / sq, sq);
