@@ -82,7 +82,8 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
     const strip = document.createElement('canvas'); strip.width = cols * cw; strip.height = Math.ceil(frames / cols) * (ch + 14); const sx = strip.getContext('2d'); sx.fillStyle = '#101018'; sx.fillRect(0, 0, strip.width, strip.height);
     const cap = { n: 0, k: 0, armed: false, done: false, t0: 0 };
     const orig = g.render.bind(g);
-    g.render = () => { orig(); if (!cap.armed || cap.done) return; cap.k++; if (cap.k % every) return; const r = rect(); const i = cap.n; const dx = (i % cols) * cw, dy = Math.floor(i / cols) * (ch + 14);
+    g.render = () => { if (kind === 'boss' && g.boss) { const b = g.boss; g.cam.x = b.x + b.w / 2 - g.viewW / 2; g.cam.y = b.y + b.h / 2 - g.viewH / 2 + 20; g.clampCam(); } // keep a boss in frame whatever the player does
+      orig(); if (!cap.armed || cap.done) return; cap.k++; if (cap.k % every) return; const r = rect(); const i = cap.n; const dx = (i % cols) * cw, dy = Math.floor(i / cols) * (ch + 14);
       const zz = g.zoom; sx.drawImage(g.canvas, (r.x - g.cam.x) * zz, (r.y - g.cam.y) * zz, w * zz, h * zz, dx, dy, cw, ch); sx.strokeStyle = '#333'; sx.strokeRect(dx + 0.5, dy + 0.5, cw - 1, ch - 1); sx.fillStyle = '#ffd9a0'; sx.font = '11px Georgia'; sx.fillText(`${i}  +${((g.time - cap.t0) * 1000).toFixed(0)}ms`, dx + 3, dy + ch + 11);
       cap.n++; if (cap.n >= frames) cap.done = true; };
     window.__cap = { cap, strip, arm: () => { cap.armed = true; cap.t0 = g.time; }, target };
@@ -112,7 +113,9 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
     else if (sc === 'sit') { await page.waitForTimeout(150); await arm(); await page.keyboard.press('ArrowUp'); await page.waitForTimeout(2500); }
     else { await arm(); await page.waitForTimeout(100 + 17 * every * frames); }
   } else { await arm(); if (has('poke')) { await page.waitForTimeout(120); await poke(); } await page.waitForTimeout(100 + 17 * every * frames); }
-  for (let i = 0; i < 40; i++) { const done = await page.evaluate(() => window.__cap.cap.done); if (done) break; await page.waitForTimeout(100); }
+  // headless frames can take 60-100 ms each, so wait for the strip to fill rather than assuming 60 fps
+  const limit = Date.now() + Math.max(8000, frames * every * 150 + 5000);
+  while (Date.now() < limit) { const done = await page.evaluate(() => window.__cap.cap.done); if (done) break; await page.waitForTimeout(100); }
   const res = await page.evaluate(() => ({ frames: window.__cap.cap.n, png: window.__cap.strip.toDataURL('image/png') }));
   fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, Buffer.from(res.png.split(',')[1], 'base64'));
   console.log(JSON.stringify({ subject, scenario, frames: res.frames, out, errors }));

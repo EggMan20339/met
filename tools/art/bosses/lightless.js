@@ -2,7 +2,8 @@
 //
 // The shell, head and legs are one body carried by a transform with two pitch pivots: `rear` rears the whole beetle
 // up on its hind feet (the roar, the leap, the beam) and `tip` bucks the rear end up over the front feet (the bonk
-// into a wall that stuns it), on top of a squash/stretch about the feet line, a lift (`bob`) and a tremble (`shake`).
+// into a wall that stuns it), on top of a squash/stretch about the feet line, a lift (`bob`), a slide of the body
+// along the floor over the planted feet (`shift`: back for a coil, forward for a lunge) and a tremble (`shake`).
 // The four legs are jointed and drawn in floor space from hips carried by that transform: the feet stay planted
 // while the body moves, lift off when a hip rises out of reach (pawing in the roar, dangling when tipped), and cycle
 // with the gait (an alternating walk that blends into a bounding gallop as the speed rises). The head nods on its
@@ -26,8 +27,9 @@
 //                          gutters; it shakes itself awake in the last 0.35 s
 //   a hit                  a flinch (compress, head up, mandibles snap, the cracks flash); death is a slow collapse
 //                          with the lantern guttering out and the legs twitching
-// The game draws the beam, the blink and the telegraph lines itself. The old world-space effects live in after()
-// (the additive lantern light, the red aura of a telegraph, the beam's pouring light, embers) and before() (charge
+// The game draws the beam, the blink and the telegraph lines itself (nothing of the puppet is drawn during the blink,
+// so the pop-in on reappearing is found by the jump in position). The old world-space effects live in after() (the
+// additive lantern light, the red aura of a telegraph, the beam's pouring light, embers) and before() (charge
 // after-images, dust). See art/ANIMATION.md.
 const L = require('../lib');
 const { svg, lin, path, ell, circ, stroke, g, rot, tr, glow, curve, mix, clamp, lerp, num: n } = L;
@@ -57,6 +59,7 @@ const params = {
   rear: 0, gaitPitch: 0, // pitch in degrees about the hind feet, positive rears the nose up: the springy one, and the gallop's rocking
   tip: 0,                // pitch about the front feet, positive bucks the rear end up (the bonk)
   shake: 0,              // a tremble of the body, template units (set each frame)
+  shift: 0,              // the body slid along the floor over the planted feet: back for a coil, forward for a lunge
   gait: 0, stride: 0, lift: 0, gallop: 0, // the leg cycle's phase, its reach 0..1, how high the feet lift 0..1, walk 0 .. gallop 1
   dig: 0, tuck: 0, splay: 0, twitch: 0,   // legs raking the floor in a coil, stretched fore and aft in a leap, flat and wide, jittering
   clock: 0,              // a free clock for the jitters and the dazed eyes
@@ -74,20 +77,20 @@ const params = {
 };
 // [stiffness, damping ratio] for the values that overshoot and settle; the clocks and amounts set each frame snap
 const springs = {
-  sx: [420, 0.5], sy: [420, 0.5], bob: [300, 0.55], rear: [180, 0.45], tip: [120, 0.32], headY: [240, 0.5], headX: [300, 0.6], jaw: [330, 0.42],
+  sx: [420, 0.5], sy: [420, 0.5], bob: [300, 0.55], rear: [180, 0.45], tip: [120, 0.32], shift: [240, 0.6], headY: [240, 0.5], headX: [300, 0.6], jaw: [330, 0.42],
   stride: [200, 0.8], lift: [200, 0.8], gallop: [60, 1], dig: [160, 0.7], tuck: [260, 0.7], splay: [160, 0.6], throat: [200, 0.8],
   eyeK: [200, 0.6], rage: [120, 1], blaze: [140, 1], daze: [80, 1], lantern: [90, 0.9], crack: [120, 0.9], gape: [40, 0.9], heat: [30, 1], bristle: [220, 0.5], pour: [160, 0.8],
 };
 // stills exported to art/lightless_<pose>.svg (idle, charge, leap, stun, phase2 and phase3 are the originals)
 const poses = {
   idle: {},
-  charge: { rear: -3, gaitPitch: 3, gaitBob: -2.5, gallop: 1, stride: 1, lift: 1, gait: 0.9, jaw: 0.85, rage: 1, eyeK: 1.5, headX: 4, headY: -5, bristle: 0.8, lantern: 1, crack: 0.6 },
-  leap: { sy: 1.12, sx: 0.92, rear: 12, tuck: 1, jaw: 0.6, headY: 8, eyeK: 1.3, bristle: 0.6, lantern: 0.8, crack: 0.5 },
+  charge: { rear: -3, gaitPitch: 3, gaitBob: -2.5, gallop: 1, stride: 1, lift: 1, gait: 0.9, jaw: 0.85, rage: 1, eyeK: 1.5, headX: 4, headY: -5, bristle: 0.8, lantern: 1, crack: 0.6, shift: 2 },
+  leap: { sy: 1.12, sx: 0.92, rear: 12, tuck: 1, jaw: 0.6, headY: 8, eyeK: 1.3, bristle: 0.6, lantern: 0.8, crack: 0.5, shift: 2 },
   stun: { tip: 14, rear: -3, daze: 1, splay: 1, headY: 2, headX: 1, jaw: 0.7, eyeK: 0.55, lantern: 0.3, bristle: 0.1, twitch: 1, clock: 1.3 },
   phase2: { heat: 1, gape: 0.5, lantern: 0.75 },
   phase3: { heat: 2, gape: 1, lantern: 1.15 },
   roar: { rear: 28, bob: -1, sy: 1.06, sx: 0.95, jaw: 1.05, headY: 14, eyeK: 1.7, lantern: 1.2, crack: 1, bristle: 1, stride: 0.5, lift: 0.6, gait: 2 },
-  charge_tele: { rear: -9, bob: 3.5, sx: 1.1, sy: 0.9, dig: 1, rage: 1, eyeK: 1.8, jaw: 0.7, headY: -9, headX: -1.5, bristle: 1, lantern: 0.9, crack: 1, stride: 0.35, gait: 1 },
+  charge_tele: { rear: -9, bob: 3.5, sx: 1.1, sy: 0.9, dig: 1, rage: 1, eyeK: 1.8, jaw: 0.7, headY: -9, headX: -1.5, bristle: 1, lantern: 0.9, crack: 1, stride: 0.35, gait: 1, shift: -4 },
   leap_tele: { sy: 0.8, sx: 1.12, bob: 3, rear: -5, dig: 0.6, headY: 6, jaw: 0.3, eyeK: 1.3, rage: 0.35, bristle: 0.5, crack: 0.5, lantern: 0.8 },
   slam: { sy: 0.88, sx: 1.12, rear: -8, splay: 1, headY: -10, jaw: 0.9, eyeK: 1.4, lantern: 1.3, crack: 1, bristle: 0.5 },
   beam_tele: { rear: 10, bob: -1, headY: -12, headX: -1, jaw: 0.35, pour: 1, lantern: 1.6, crack: 1, gape: 0.3, blaze: 1, eyeK: 1.8, bristle: 1, dig: 0.4 },
@@ -99,7 +102,7 @@ function bodyPt(P, x, y) {
   x = FRONT + dx * c - dy * s; y = FY + dx * s + dy * c;
   a = -(P.rear + P.gaitPitch) * RAD; c = Math.cos(a); s = Math.sin(a); dx = x - HIND; dy = y - FY;
   x = HIND + dx * c - dy * s; y = FY + dx * s + dy * c;
-  return { x: CX + (x - CX) * P.sx + P.shake, y: FY + (y - FY) * P.sy + P.bob + P.gaitBob };
+  return { x: CX + (x - CX) * P.sx + P.shake + P.shift, y: FY + (y - FY) * P.sy + P.bob + P.gaitBob };
 }
 // a head point (the antenna root): the nod about the neck joint (57, 37) and the thrust, then the body
 function headPt(P, x, y) {
@@ -114,6 +117,7 @@ function make(P, pup) {
   const jaw = clamp(P.jaw, -0.1, 1.3), pour = q(clamp(P.pour, 0, 1.2)), ek = clamp(P.eyeK, 0, 2.6), open = clamp(P.eyeOpen, 0, 1), dz = clamp(P.daze, 0, 1), thr = clamp(P.throat, 0, 1.2);
   const shellG = lin('lsh', 10, 6, 60, 44, [[0, mix('#5a4a5c', '#3a2a34', hq3)], [0.5, mix('#3a2a3a', '#22181f', hq3)], [1, '#15100f']]);
   const glowCol = mix('#ffd080', '#fff0c0', hq), crackCol = mix(mix('#ff8a3c', '#fff4d0', hq), '#ffffff', q(ck * 0.5)), spineCol = mix('#3a2a3a', '#241620', hq3);
+  const lq = q(Math.min(lan, 2) / 2), legHi = mix('#5a4650', '#b08060', lq * 0.5), legHiFar = mix('#3a2c34', '#6a5040', lq * 0.5); // a ridge of lantern light along each leg, so the joints read against the dark floor
   // ---- legs, in floor space: hips carried by the body, feet planted unless the gait, a stretch, a splay or a twitch moves them, pulled after a hip that rises out of reach
   const gal = clamp(P.gallop, 0, 1), st = clamp(P.stride, 0, 1.3), lf = clamp(P.lift, 0, 1.3), dig = clamp(P.dig, 0, 1.2), tk = clamp(P.tuck, 0, 1.2), sp = clamp(P.splay, 0, 1.2), tw = clamp(P.twitch, 0, 1);
   const legs = [];
@@ -121,11 +125,12 @@ function make(P, pup) {
     const hip = bodyPt(P, HIPX[i], 40), bow = i < 2 ? -1 : 1;
     const phW = P.gait + (i % 2) * Math.PI, phG = P.gait + (i < 2 ? 0 : 2.2) + (i % 2) * 0.35;
     const sw = lerp(Math.cos(phW), Math.cos(phG), gal), up = lerp(Math.max(0, -Math.sin(phW)), Math.max(0, -Math.sin(phG)), gal) * st;
-    let fx = FOOTX[i] + sw * (3.5 + 3.5 * gal) * st + dig * (i < 2 ? 2 : 4) + bow * (sp * 5 + tk * 6) + tw * Math.sin(P.clock * 31 + i * 2.1) * 1.3;
-    let fy = FY - up * (2.5 + 4 * lf) - tk * (i < 2 ? 2 : 4) - tw * Math.max(0, Math.sin(P.clock * 23 + i * 1.7)) * 2;
+    let fx = FOOTX[i] + sw * (3.5 + 3.5 * gal) * st + dig * (i < 2 ? 2 : 4) + bow * (sp * 5 + tk * 6) + tw * Math.sin(P.clock * 31 + i * 2.1) * 2.2;
+    let fy = FY - up * (2.5 + 4 * lf) - tk * (i < 2 ? 2 : 4) - tw * Math.max(0, Math.sin(P.clock * 23 + i * 1.7)) * 3.2;
     const dx = fx - hip.x, dy = fy - hip.y, d = Math.hypot(dx, dy); if (d > LMAX) { fx = hip.x + dx / d * LMAX; fy = hip.y + dy / d * LMAX; }
     const kx = hip.x + bow * (5 + up * 2 + dig * 1.5 + sp * 2) + (fx - hip.x) * 0.2, ky = Math.min(fy - 1, hip.y + 6.5 - up * 2.5 - dig * 2 + sp * 1.5);
-    legs.push(stroke(`M${n(hip.x)} ${n(hip.y)} L${n(kx)} ${n(ky)} L${n(fx)} ${n(fy)} l${n(bow * 2.4)} 0.6`, i % 2 ? LEG_FAR : LEG, 3.2));
+    const ld = `M${n(hip.x)} ${n(hip.y)} L${n(kx)} ${n(ky)} L${n(fx)} ${n(fy)} l${n(bow * 2.4)} 0.6`;
+    legs.push(stroke(ld, i % 2 ? LEG_FAR : LEG, 3.2), stroke(ld, i % 2 ? legHiFar : legHi, 1, { opacity: 0.85 }));
   }
   // ---- the shell: the lantern's glow bleeding around it, the iron cage, cracks that widen and multiply with the phases and flare on attacks
   const inner = glow(34, 24, 22 + lan * 2, glowCol, q(0.3 + lan * 0.3));
@@ -151,7 +156,7 @@ function make(P, pup) {
     open > 0.35 ? circ(cx + dz * Math.cos(th) * r * 0.4, cy + dz * Math.sin(th) * r * 0.4 * open, r * 0.45, '#ffffff', { opacity: 0.8 }) : null];
   const headG = g([head, throat, mandU, mandL, eye(64, 34, 3), eye(59, 30, 1.8)], { transform: `${tr(P.headX, 0)} ${rot(-P.headY, 57, 37)}` });
   const body = g([inner, shell, seams, plates, cage, crackGlow, cracks, crackHi, cr2, cr3, spines, rays, headG],
-    { transform: `${tr(CX + P.shake, FY + P.bob + P.gaitBob)} scale(${n(P.sx)} ${n(P.sy)}) ${tr(-CX, -FY)} ${rot(-(P.rear + P.gaitPitch), HIND, FY)} ${rot(P.tip, FRONT, FY)}` });
+    { transform: `${tr(CX + P.shake + P.shift, FY + P.bob + P.gaitBob)} scale(${n(P.sx)} ${n(P.sy)}) ${tr(-CX, -FY)} ${rot(-(P.rear + P.gaitPitch), HIND, FY)} ${rot(P.tip, FRONT, FY)}` });
   // ---- the antenna: a chain off the brow when animated, its rest curve for the stills; the far one is the same curve set back
   const base = headPt(P, 63, 27);
   const pts = pup && pup.chains.ant ? pup.chains.ant.points() : [base].concat(ANT_REST.map((p) => ({ x: base.x + p.x, y: base.y + p.y })));
@@ -182,8 +187,9 @@ function control(b, pup, info) {
   // ---- events, found by watching the entity: a state change, a timer crossing, a hit, a phase change, a turn, death
   const st = b.state, prev = m.state, entered = st !== prev, pt = m.t, p = b.phase || 1;
   const hit = b.alive && (b.hp < m.hp || (b.flash > 0 && m.flash <= 0)), died = !b.alive && m.alive, phased = p !== m.phase, turned = b.facing !== m.facing;
+  const warped = m.x !== undefined && Math.abs(b.x - m.x) > 60; // it reappeared somewhere else: the game draws nothing for the blink itself, so this is how the pop-in is found
   const crossed = (at) => !entered && pt < at && b.t >= at;
-  m.state = st; m.t = b.t; m.hp = b.hp; m.flash = b.flash || 0; m.alive = b.alive; m.phase = p; m.facing = b.facing;
+  m.state = st; m.t = b.t; m.hp = b.hp; m.flash = b.flash || 0; m.alive = b.alive; m.phase = p; m.facing = b.facing; m.x = b.x;
   const lanP = p === 3 ? 1.15 : p === 2 ? 0.75 : 0.5, gapeP = p === 3 ? 1 : p === 2 ? 0.5 : 0, heatP = p - 1, hot = p >= 2 ? 1.25 : 1;
   // ---- locomotion: the leg cycle runs from the speed (a slow heavy walk, a gallop past ~100 world units/s)
   const moving = speedT > 6;
@@ -196,9 +202,9 @@ function control(b, pup, info) {
   m.fidget -= dt; if (m.fidget < 0) { m.fidget = (2 + Math.random() * 3.5) / hot; const r = Math.random(); if (r < 0.4) m.chew = 0.5 + Math.random() * 0.6; else if (r < 0.6) m.shuffle = 0.18; else if (r < 0.8) pup.impulse('headY', Math.random() < 0.5 ? 90 : -90); else { const tp = ant.pts[ant.pts.length - 1]; tp.px += 1.6; tp.py += 1; } }
   if (m.chew > 0) m.chew -= dt;
   const brth = Math.sin(t * 2.1 * hot);
-  const T = { clock: pup.time, shake: 0, twitch: 0, eyeOpen: 1, gait: m.gait, gaitBob: 0, gaitPitch: 0, stride, lift, gallop: sm(speedT, 140, 330),
+  const T = { clock: pup.time, shake: 0, shift: 0, twitch: 0, eyeOpen: 1, gait: m.gait, gaitBob: 0, gaitPitch: 0, stride, lift, gallop: sm(speedT, 140, 330),
     sx: 1 - brth * 0.008, sy: 1 + brth * 0.014, bob: Math.sin(t * 0.9) * 0.4, rear: Math.sin(t * 0.6) * 0.8, tip: 0,
-    headX: 0, headY: m.lookTo + Math.sin(t * 1.3) * 1.5, jaw: m.chew > 0 ? 0.14 + Math.sin(t * 13) * 0.13 : 0.04 + Math.max(0, Math.sin(t * 0.8)) * 0.04,
+    headX: 0, headY: m.lookTo + Math.sin(t * 1.3) * 1.5, jaw: m.chew > 0 ? 0.14 + Math.sin(t * 13) * 0.13 : 0.04 + Math.pow(Math.max(0, Math.sin(t * 1.4)), 3) * 0.2,
     eyeK: 1 + Math.sin(t * 4) * 0.08, rage: 0, blaze: 0, daze: 0, throat: 0, pour: 0, dig: 0, tuck: 0, splay: 0, bristle: 0.08 + Math.max(0, Math.sin(t * 0.5)) * 0.1,
     lantern: lanP + Math.sin(t * 3) * 0.06 + (p === 3 ? Math.sin(t * 11) * 0.05 : 0), crack: 0, gape: gapeP, heat: heatP };
   let auraT = 0, antGrav = 8, antStiff = 9, shake = 0, ghosting = false;
@@ -220,22 +226,22 @@ function control(b, pup, info) {
       if (crossed(1.02)) { pup.impulse('sy', -4.5).impulse('sx', 3).impulse('rear', -150).impulse('headY', -220); dust(44, 51, -25, 2.5, 0.5); dust(60, 51, 30, 2.5, 0.5); m.jolt = 1; }
       break; }
     case 'charge_tele': { const dur = p >= 2 ? 0.45 : 0.6, k = clamp(b.t / dur, 0, 1), e = k * k, last = sm(k, 0.82, 1);
-      Object.assign(T, { rear: -4 - 4 * e - 2 * last, bob: 1 + 2 * e + 1 * last, sx: 1.04 + 0.06 * e, sy: 0.96 - 0.06 * e, dig: 0.3 + 0.7 * k, rage: 1, eyeK: 1.3 + 0.5 * k, jaw: k < 0.75 ? 0.05 : 0.7, headY: -6 - 4 * e, headX: -1.5 * e, bristle: 0.6 + 0.4 * k, lantern: lanP + 0.45 * k, crack: 0.4 + 0.6 * k });
+      Object.assign(T, { rear: -4 - 4 * e - 2 * last, bob: 1 + 2 * e + 1 * last, sx: 1.04 + 0.06 * e, sy: 0.96 - 0.06 * e, shift: -2.5 - 2.5 * e, dig: 0.3 + 0.7 * k, rage: 1, eyeK: 1.3 + 0.5 * k, jaw: k < 0.75 ? 0.05 : 0.7, headY: -6 - 4 * e, headX: -1.5 * e, bristle: 0.6 + 0.4 * k, lantern: lanP + 0.45 * k, crack: 0.4 + 0.6 * k });
       shake = 0.3 + 1.4 * e; rate = 3.2; stride = 0.35; lift = 0.3; auraT = 1;
-      if (entered && prev === 'blink') { pup.snap({ sx: 0.6, sy: 1.45, bob: -6, lantern: 2.2 }); pup.impulse('sx', 3).impulse('sy', -4); emitCracks(10, 0, -40, 160, 0.6, 90); ant.reset(); }
+      if (warped) { pup.snap({ sx: 0.6, sy: 1.45, bob: -6, lantern: 2.2 }); pup.impulse('sx', 3).impulse('sy', -4); emitCracks(10, 0, -40, 160, 0.6, 90); ant.reset(); for (const k of m.sparks) if (k.life > 0 && Math.abs(k.x - cx) > 120) k.life = 0; }
       if (crossed(dur * 0.75)) { pup.impulse('jaw', 10).impulse('headY', -120); emitCracks(2, -30, -50, 60, 0.5, 120); }
       break; }
     case 'charge': { // the gallop: the body is set by the gait below; here the head, the eyes and the trail
-      Object.assign(T, { rear: -3, jaw: 0.85, headX: 4, headY: -5, rage: 1, eyeK: 1.5, bristle: 0.8, lantern: lanP + 0.5, crack: 0.6 + Math.sin(t * 20) * 0.2, bob: 0, sx: 1, sy: 1 }); shake = 0.25; ghosting = true; antStiff = 4;
-      if (entered) { pup.impulse('rear', 260).impulse('sy', 3.5).impulse('sx', -2.5).impulse('bob', -70).impulse('jaw', 6); emitCracks(8, -90, -40, 120, 0.6, 150); dust(12, 51, -40, 3, 0.6); dust(26, 51, -30, 2.5, 0.6); m.ghostT = 0; }
+      Object.assign(T, { rear: -3, jaw: 0.85, headX: 4, headY: -5, rage: 1, eyeK: 1.5, bristle: 0.8, lantern: lanP + 0.5, crack: 0.6 + Math.sin(t * 20) * 0.2, bob: 0, sx: 1, sy: 1, shift: 2 }); shake = 0.25; ghosting = true; antStiff = 4;
+      if (entered) { pup.impulse('rear', 260).impulse('sy', 3.5).impulse('sx', -2.5).impulse('bob', -70).impulse('jaw', 6).impulse('shift', 140); emitCracks(8, -90, -40, 120, 0.6, 150); dust(12, 51, -40, 3, 0.6); dust(26, 51, -30, 2.5, 0.6); m.ghostT = 0; }
       m.emberT += dt; if (m.emberT > 0.06) { m.emberT = 0; emitCracks(1, -120, -30, 60, 0.45, 100); }
       break; }
     case 'leap_tele': { const k = clamp(b.t / LEAP_TELE, 0, 1), c = sm(k, 0, 0.7), last = sm(k, 0.8, 1);
-      Object.assign(T, { sy: 1 - 0.2 * c - 0.05 * last, sx: 1 + 0.12 * c + 0.03 * last, bob: 3 * c + 1.5 * last, rear: -5 * c, dig: 0.6, headY: 6, jaw: 0.3, eyeK: 1.3, rage: 0.35, bristle: 0.5, crack: 0.5, lantern: lanP + 0.3 }); shake = 0.4 * last; antGrav = 30;
+      Object.assign(T, { sy: 1 - 0.2 * c - 0.05 * last, sx: 1 + 0.12 * c + 0.03 * last, bob: 3 * c + 1.5 * last, rear: -5 * c, shift: -2 * c, dig: 0.6, headY: 6, jaw: 0.3, eyeK: 1.3, rage: 0.35, bristle: 0.5, crack: 0.5, lantern: lanP + 0.3 }); shake = 0.4 * last; antGrav = 30;
       break; }
     case 'leap': { const vk = clamp(b.vy / 560, -1, 1), up = b.vy < 0;
-      Object.assign(T, { sy: 1.12 - 0.1 * Math.max(0, vk), sx: 0.92 + 0.08 * Math.max(0, vk), rear: clamp(-vk * 12, -8, 14), bob: 0, tuck: up ? 1 : 0.35, splay: up ? 0 : 0.5, headY: up ? 8 : -10, jaw: 0.6, eyeK: 1.3, bristle: 0.6, lantern: lanP + 0.3, crack: 0.5 }); antGrav = -10; antStiff = 3;
-      if (entered) { pup.impulse('sy', 7).impulse('sx', -4).impulse('rear', 300).impulse('bob', -90).impulse('tuck', 12); dust(10, 51, -30, 3, 0.6); dust(30, 51, -10, 2.5, 0.6); dust(44, 51, 10, 2.5, 0.6); dust(60, 51, 30, 3, 0.6); emitCracks(4, 0, 60, 80, 0.5, -40); }
+      Object.assign(T, { sy: 1.12 - 0.1 * Math.max(0, vk), sx: 0.92 + 0.08 * Math.max(0, vk), rear: clamp(-vk * 12, -8, 14), bob: 0, shift: up ? 2 : 0, tuck: up ? 1 : 0.35, splay: up ? 0 : 0.5, headY: up ? 8 : -10, jaw: 0.6, eyeK: 1.3, bristle: 0.6, lantern: lanP + 0.3, crack: 0.5 }); antGrav = -10; antStiff = 3;
+      if (entered) { pup.impulse('sy', 7).impulse('sx', -4).impulse('rear', 300).impulse('bob', -90).impulse('tuck', 12).impulse('shift', 90); dust(10, 51, -30, 3, 0.6); dust(30, 51, -10, 2.5, 0.6); dust(44, 51, 10, 2.5, 0.6); dust(60, 51, 30, 3, 0.6); emitCracks(4, 0, 60, 80, 0.5, -40); }
       break; }
     case 'slam': { const k = clamp(b.t / SLAM, 0, 1);
       Object.assign(T, { sy: 0.9 + 0.1 * sm(k, 0.15, 0.6), sx: 1.1 - 0.1 * sm(k, 0.15, 0.6), rear: -8 * (1 - sm(k, 0.3, 0.8)), bob: 1.5 * (1 - sm(k, 0.2, 0.7)), splay: 1 - 0.7 * sm(k, 0.35, 0.9), headY: -10 + 10 * sm(k, 0.3, 0.8), jaw: 0.9 - 0.7 * sm(k, 0.2, 0.7), lantern: lanP + 0.8 * (1 - sm(k, 0, 0.5)), crack: 1 - sm(k, 0, 0.6), eyeK: 1.4, bristle: 0.8 * (1 - k) });
@@ -279,6 +285,7 @@ function control(b, pup, info) {
     default: { // idle (and anything unknown): breathing, a slow sway, working mandibles, glances; the walk while it is still rolling
       if (entered && prev === 'charge') { pup.impulse('rear', -180).impulse('sx', 2.5).impulse('headY', -120); dust(12, 51, -30, 2.5, 0.5); dust(44, 51, 10, 2, 0.5); }
       if (entered && prev === 'stun') pup.impulse('sy', 2).impulse('bob', -25).impulse('bristle', 4);
+      T.tip = Math.sin(t * 0.45 + 1) * 0.5; // a slow shift of weight between the front and hind feet
       if (p === 3) { T.bristle += 0.15; T.eyeK += 0.15; m.emberT += dt; if (m.emberT > 0.3) { m.emberT = 0; emitCracks(1, 0, -25, 20, 1.0, -8); } }
       break; }
   }
@@ -286,7 +293,7 @@ function control(b, pup, info) {
   m.gait += rate * TAU * dt; if (m.gait > 1e4) m.gait -= Math.floor(m.gait / TAU) * TAU;
   const gal = P.gallop; T.gait = m.gait; T.stride = stride; T.lift = lift;
   T.gaitBob = -((Math.sin(m.gait + 0.6) * 0.5 + 0.5) * 3 * gal + (1 - gal) * Math.max(0, Math.sin(2 * m.gait)) * 0.9) * stride;
-  T.gaitPitch = gal * Math.sin(m.gait + 1.3) * 5 * stride;
+  T.gaitPitch = (gal * Math.sin(m.gait + 1.3) * 5 + (1 - gal) * Math.sin(m.gait) * 1.6) * stride; // the gallop rocks once per bound, the walk once per step
   const sb = Math.sin(m.gait); if (st === 'charge' && m.bound < 0 && sb >= 0) { dust(12, 51, -60, 2.5, 0.45); dust(26, 51, -40, 2, 0.4); pup.impulse('sy', -1.2); } m.bound = sb >= 0 ? 1 : -1;
   // ---- reactions: a hit, a phase change, a turn, death
   if (hit) { m.hitT = 0; pup.impulse('sx', -3).impulse('sy', 1.8).impulse('headY', 170).impulse('jaw', 7).impulse('eyeK', 10).impulse('rear', -90); emitCracks(4, -40, -70, 90, 0.5, 160); for (const pt2 of ant.pts) pt2.px -= 1.5; }

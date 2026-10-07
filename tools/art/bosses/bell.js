@@ -111,12 +111,7 @@ function make(P, pup) {
 }
 
 // ---- animation: from the boss's state and timers to parameter targets, impulses and the tentacle chains, every frame
-let LAST = null; // the puppet that animated the bell last frame (see the death note below)
 function control(b, pup, info) {
-  // While the bell is dead the game draws it through a fresh copy of the entity every frame (drawBell's fade + flash), which gets a brand
-  // new puppet each time: adopt the previous puppet's state so the springs and chains carry on through the death instead of resetting
-  if (pup.mem.init === undefined && !b.alive && LAST && LAST !== pup) { pup.P = LAST.P; pup.V = LAST.V; pup.T = LAST.T; pup.chains = LAST.chains; pup.mem = LAST.mem; pup.time = LAST.time; }
-  LAST = pup;
   const dt = info.dt, m = pup.mem, s = pup.scale || SCALE, P = pup.P;
   if (m.init === undefined) {
     m.init = true; m.state = b.state; m.t = b.t; m.hp = b.hp; m.flash = 0; m.facing = b.facing; m.phase = b.phase; m.alive = b.alive;
