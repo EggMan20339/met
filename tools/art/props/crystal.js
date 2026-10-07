@@ -94,7 +94,7 @@ function control(e, pup, info) {
   if (m.init === undefined) {
     m.init = true; m.ph = ((e.tx || 0) * 1.7 + (e.ty || 0) * 0.9) % 6.283; m.gT = [Math.random() * 3, Math.random() * 4, Math.random() * 3.5];
     m.chimeT = 1.5 + Math.random() * 4; m.near = false; m.pAir = false; m.pvy = 0; m.kick = 0; m.passCd = 0; m.attackT = 0; m.focusT = 0;
-    m.cue = null; m.cueT = -1; m.simNear = 0; m.simFeed = 0; m.simFT = 0; m.rip = 0; m.burstT = -1;
+    m.cue = null; m.cueT = -1; m.simNear = 0; m.simFeed = 0; m.simFT = 0; m.rip = 0; m.burstT = -1; m.gk = [0, 0, 0];
   }
   const t = pup.time, humK = clamp(P.hum, 0, 1.2);
   // ---- a cue set on the entity (filmstrips) plays one beat a moment later
@@ -131,9 +131,8 @@ function control(e, pup, info) {
   m.chimeT -= dt * (1 + 1.5 * humK);
   if (m.chimeT < 0 || cue === 'chime') { m.chimeT = 2.5 + Math.random() * 5; const i = 1 + (Math.random() * 3 | 0); pup.impulse('sway' + i, (Math.random() < 0.5 ? -1 : 1) * (60 + Math.random() * 50)).impulse('tip' + i, 14 + Math.random() * 8).impulse('inner', 1.2); }
   // the glints travel up their edges, each on its own period, hurrying while the crystal hums or feeds; the ripples cycle while it hums
-  const gs = 1 + 0.7 * humK + 0.8 * feedK;
-  for (let i = 0; i < 3; i++) m.gT[i] += dt * gs;
-  const gk = (i) => { const kk = (m.gT[i] / GLINT_PER[i]) % 1; return kk * kk * (3 - 2 * kk); };
+  const gs = 1 + 0.7 * humK + 0.8 * feedK, gk = m.gk;
+  for (let i = 0; i < 3; i++) { m.gT[i] += dt * gs; const kk = (m.gT[i] / GLINT_PER[i]) % 1; gk[i] = kk * kk * (3 - 2 * kk); }
   if (humK > 0.02) m.rip += dt * (1 + 1.2 * feedK);
   let burst = 0; if (m.burstT >= 0) { m.burstT += dt; const kk = m.burstT / 0.5; if (kk >= 1) m.burstT = -1; else burst = Math.pow(1 - kk, 1.2); }
   // ---- targets: the breath (period ~3 s, the old pulse), brighter for company and brighter still while it feeds a rekindling;
@@ -143,7 +142,7 @@ function control(e, pup, info) {
     inner: 0.7 * breath * (1 - 0.5 * humK) + 0.15 * warmK * (1 - humK) + 0.45 * humK + 0.9 * feedK,
     halo: P.inner, hum: near || feeding ? 1 : 0, ring: m.rip % 1, burst, quiver: 1.3 * humK + feedK, qt: t,
     sway1: 0, sway2: 0, sway3: 0, tip1: 0, tip2: 0, tip3: 0, sx: 1, sy: 1,
-    glint1: gk(0), glint2: gk(1), glint3: gk(2),
+    glint1: gk[0], glint2: gk[1], glint3: gk[2],
     hx: clamp(dx / WARM, -1, 1) * 1.6 * warmK,
   });
 }
@@ -156,7 +155,7 @@ function after(ctx, e, pup, info) {
   info.glowAt(bx + clamp(P.hx, -3, 3) * s, by - 10, 12 * (0.9 + 0.2 * Math.min(halo, 1)) + 4 * hum, '#e6c8ff', clamp(0.1 + 0.16 * halo + 0.1 * hum, 0, 0.5));
   if (hum > 0.02) {
     const r = (10.5 + 0.35 * Math.sin(6.2832 * P.ring)) * s, cy = by - HY * s;
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
     ctx.lineWidth = 3.5 * s; ctx.strokeStyle = `rgba(226,200,255,${(0.12 * hum).toFixed(3)})`; ctx.beginPath(); ctx.arc(bx, cy, r, 0, 6.2832); ctx.stroke();
     ctx.lineWidth = 1; ctx.strokeStyle = `rgba(250,242,255,${(0.3 * hum).toFixed(3)})`; ctx.beginPath(); ctx.arc(bx, cy, r, 0, 6.2832); ctx.stroke();
     ctx.restore();
