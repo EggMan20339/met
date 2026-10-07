@@ -74,13 +74,16 @@ const server = http.createServer((req, res) => { const u = decodeURIComponent(re
       rect = () => ({ x: pk.x - w / 2, y: pk.y - h / 2 });
     } else return { error: 'unknown subject ' + subject };
     g.state = 'play';
+    // pin the render scale: headless rendering is slow enough to trigger the game's adaptive resolution, which would change
+    // the zoom (and the crop) mid-capture
+    g.adaptQuality = () => {}; g.renderScale = 1; g.resize();
     // capture hook: after every render, copy the region around the subject into the strip
     const cols = Math.min(8, frames); const z = g.zoom; const cw = Math.round(w * z), ch = Math.round(h * z);
     const strip = document.createElement('canvas'); strip.width = cols * cw; strip.height = Math.ceil(frames / cols) * (ch + 14); const sx = strip.getContext('2d'); sx.fillStyle = '#101018'; sx.fillRect(0, 0, strip.width, strip.height);
     const cap = { n: 0, k: 0, armed: false, done: false, t0: 0 };
     const orig = g.render.bind(g);
     g.render = () => { orig(); if (!cap.armed || cap.done) return; cap.k++; if (cap.k % every) return; const r = rect(); const i = cap.n; const dx = (i % cols) * cw, dy = Math.floor(i / cols) * (ch + 14);
-      sx.drawImage(g.canvas, (r.x - g.cam.x) * z, (r.y - g.cam.y) * z, w * z, h * z, dx, dy, cw, ch); sx.strokeStyle = '#333'; sx.strokeRect(dx + 0.5, dy + 0.5, cw - 1, ch - 1); sx.fillStyle = '#ffd9a0'; sx.font = '11px Georgia'; sx.fillText(`${i}  +${((g.time - cap.t0) * 1000).toFixed(0)}ms`, dx + 3, dy + ch + 11);
+      const zz = g.zoom; sx.drawImage(g.canvas, (r.x - g.cam.x) * zz, (r.y - g.cam.y) * zz, w * zz, h * zz, dx, dy, cw, ch); sx.strokeStyle = '#333'; sx.strokeRect(dx + 0.5, dy + 0.5, cw - 1, ch - 1); sx.fillStyle = '#ffd9a0'; sx.font = '11px Georgia'; sx.fillText(`${i}  +${((g.time - cap.t0) * 1000).toFixed(0)}ms`, dx + 3, dy + ch + 11);
       cap.n++; if (cap.n >= frames) cap.done = true; };
     window.__cap = { cap, strip, arm: () => { cap.armed = true; cap.t0 = g.time; }, target };
     return { ok: true, zoom: z, w, h, area: g.area };
